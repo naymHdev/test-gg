@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment Successful</title>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --green: #16a34a;
+            --green-light: #dcfce7;
+            --green-border: #86efac;
+            --text: #0f172a;
+            --muted: #64748b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        /* ── Backdrop ── */
+        .backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            animation: fadeIn 0.25s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0
+            }
+
+            to {
+                opacity: 1
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px) scale(0.97)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1)
+            }
+        }
+
+        @keyframes pop {
+            0% {
+                transform: scale(0)
+            }
+
+            65% {
+                transform: scale(1.15)
+            }
+
+            100% {
+                transform: scale(1)
+            }
+        }
+
+        /* ── Modal card ── */
+        .modal {
+            background: var(--card);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            width: 100%;
+            max-width: 460px;
+            overflow: hidden;
+            animation: slideUp 0.35s cubic-bezier(.22, .68, 0, 1.2);
+        }
+
+        /* green top bar */
+        .modal-header {
+            background: var(--green);
+            padding: 2rem 2rem 1.5rem;
+            text-align: center;
+        }
+
+        .icon-ring {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            animation: pop 0.4s 0.2s cubic-bezier(.22, .68, 0, 1.2) both;
+        }
+
+        .icon-ring svg {
+            width: 36px;
+            height: 36px;
+            color: #fff;
+        }
+
+        .modal-header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.02em;
+        }
+
+        .modal-header p {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 0.25rem;
+        }
+
+        /* body */
+        .modal-body {
+            padding: 1.5rem 1.75rem 1.75rem;
+        }
+
+        /* amount highlight */
+        .amount-box {
+            background: var(--green-light);
+            border: 1px solid var(--green-border);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+        }
+
+        .amount-box .label {
+            font-size: 0.8rem;
+            color: var(--green);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .amount-box .value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: var(--green);
+            letter-spacing: -0.03em;
+        }
+
+        /* detail rows */
+        .details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.625rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            font-size: 0.875rem;
+            padding-bottom: 0.625rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .row .key {
+            color: var(--muted);
+            font-weight: 500;
+            flex-shrink: 0;
+            margin-right: 0.5rem;
+        }
+
+        .row .val {
+            color: var(--text);
+            font-weight: 600;
+            text-align: right;
+            word-break: break-all;
+        }
+
+        .row .val.mono {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        /* badge */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: var(--green-light);
+            color: var(--green);
+            border-radius: 999px;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .badge::before {
+            content: '●';
+            font-size: 0.5rem;
+        }
+
+        /* button */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 0.875rem;
+            background: var(--green);
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            transition: background 0.15s, transform 0.1s;
+        }
+
+        .btn:hover {
+            background: #15803d;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* loading state */
+        .loading {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--muted);
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid #e2e8f0;
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        /* error state */
+        .error-state {
+            text-align: center;
+            padding: 2rem 1.5rem;
+        }
+
+        .error-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .error-state h2 {
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+
+        .error-state p {
+            color: var(--muted);
+            font-size: 0.875rem;
+            margin-bottom: 1.25rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="backdrop">
+        <div class="modal" id="modal">
+            <!-- content injected by JS -->
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Verifying payment…</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = window.location.origin; // e.g. http://10.10.10.5:5008
+
+        function fmt(amount, currency = 'USD') {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(Number(amount));
+        }
+
+        function shortId(id) {
+            if (!id) return '—';
+            return id.length > 20 ? id.slice(0, 10) + '…' + id.slice(-6) : id;
+        }
+
+        function typeLabel(type) {
+            if (!type) return '—';
+            return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function renderSuccess(data) {
+            const tx = data.transaction || {};
+            const currency = (tx.currency || 'USD').toUpperCase();
+
+            document.getElementById('modal').innerHTML = `
+      <div class="modal-header">
+        <div class="icon-ring">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        </div>
+        <h1>Payment Successful</h1>
+        <p>${data.customerEmail || ''}</p>
+      </div>
+
+      <div class="modal-body">
+        <div class="amount-box">
+          <div>
+            <div class="label">Amount Paid</div>
+            <div class="value">${fmt(tx.amount, currency)}</div>
+          </div>
+          <span class="badge">PAID</span>
+        </div>
+
+        <div class="details">
+          <div class="row">
+            <span class="key">Type</span>
+            <span class="val">${typeLabel(tx.type)}</span>
+          </div>
+          <div class="row">
+            <span class="key">Platform fee</span>
+            <span class="val">${fmt(tx.platformFee, currency)}</span>
+          </div>
+          <div class="row">
+            <span class="key">Vendor receives</span>
+            <span class="val">${fmt(tx.vendorAmount, currency)}</span>
+          </div>
+          <div class="row">
+            <span class="key">Transaction ID</span>
+            <span class="val mono">${shortId(tx.id)}</span>
+          </div>
+          <div class="row">
+            <span class="key">Payment Intent</span>
+            <span class="val mono">${shortId(data.paymentIntentId)}</span>
+          </div>
+          <div class="row">
+            <span class="key">Date</span>
+            <span class="val">${tx.updatedAt ? new Date(tx.updatedAt).toLocaleString() : '—'}</span>
+          </div>
+        </div>
+
+        <a href="/" class="btn">Back to Home</a>
+      </div>
+    `;
+        }
+
+        function renderCancel(transactionId) {
+            document.getElementById('modal').innerHTML = `
+      <div class="modal-body" style="padding-top:2rem">
+        <div class="error-state">
+          <div class="error-icon">❌</div>
+          <h2>Payment Cancelled</h2>
+          <p>Your payment was not completed. No charges were made.</p>
+          ${transactionId ? `<p style="font-size:0.78rem;color:#94a3b8;margin-bottom:1rem">Ref: ${transactionId}</p>` : ''}
+          <a href="/" class="btn" style="background:#0f172a">Back to Home</a>
+        </div>
+      </div>
+    `;
+        }
+
+        function renderError(msg) {
+            document.getElementById('modal').innerHTML = `
+      <div class="modal-body" style="padding-top:2rem">
+        <div class="error-state">
+          <div class="error-icon">⚠️</div>
+          <h2>Something went wrong</h2>
+          <p>${msg || 'Could not verify payment status.'}</p>
+          <a href="/" class="btn" style="background:#64748b">Back to Home</a>
+        </div>
+      </div>
+    `;
+        }
+
+        // ── Detect which page we're on ──────────────────────────────────────────────
+        const path = window.location.pathname;
+        const params = new URLSearchParams(window.location.search);
+
+        if (path.includes('cancel')) {
+            // Cancel page — just show modal immediately (no API call needed)
+            renderCancel(params.get('transactionId'));
+        } else {
+            // Success page — fetch real data
+            const sessionId = params.get('session_id');
+            if (!sessionId) {
+                renderError('Missing session_id parameter.');
+            } else {
+                fetch(`${BASE_URL}/payment/success?session_id=${sessionId}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            renderSuccess(data.data);
+                        } else {
+                            renderError(data.message || 'Payment verification failed.');
+                        }
+                    })
+                    .catch(() => renderError('Network error while verifying payment.'));
+            }
+        }
+    </script>
+</body>
+
+</html>

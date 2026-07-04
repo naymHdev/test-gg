@@ -1,0 +1,293 @@
+FinderQ Voice Channel System Requirements (v1)
+Overview
+
+Every registered user can create and manage their own voice channel at any time.
+
+Each user may own one active voice channel.
+
+A voice channel remains active as long as at least one participant is connected.
+
+The creator automatically becomes the Channel Owner and receives full management permissions.
+
+Voice Channel Creation
+
+Every user can:
+
+Create a new voice channel.
+Set a custom channel name.
+Add an optional description.
+Choose Public or Private visibility.
+Set the maximum number of participants.
+Generate an invite link.
+Delete the channel (if owner).
+Channel Owner Permissions
+
+Only the channel owner can perform the following actions.
+
+Member Management
+Kick any participant.
+Mute a participant.
+Unmute a participant.
+Deafen a participant.
+Undeafen a participant.
+Ban a participant from rejoining the channel (optional).
+Transfer ownership to another participant.
+Channel Management
+Rename the channel.
+Edit the channel description.
+Change the participant limit.
+Lock / Unlock the channel.
+Switch between Public and Private.
+Enable / Disable Waiting Room.
+Generate or revoke invite links.
+Delete the channel.
+Participant Permissions
+
+Every participant can:
+
+Join public voice channels.
+Request to join private channels.
+Leave the channel.
+Mute themselves.
+Unmute themselves.
+Deafen themselves.
+Undeafen themselves.
+View all connected participants.
+See who is currently speaking.
+Adjust individual participant volume locally.
+Enable Push-To-Talk.
+Enable Voice Activity Detection.
+Send messages in the channel chat.
+Share their screen.
+Stop screen sharing.
+Watch another participant's shared screen.
+Enable webcam.
+Disable webcam.
+Watch webcams of other participants.
+
+Participants cannot moderate other users.
+
+Screen Sharing
+
+Every participant can share their screen.
+
+Supported sharing methods:
+
+Entire screen
+Application window
+Browser tab
+Multiple monitors (if supported)
+
+Supported features:
+
+Share system audio.
+Pause sharing.
+Resume sharing.
+Stop sharing.
+
+Quality Settings:
+
+Resolution:
+
+Auto
+720p
+1080p
+1440p
+4K (if supported)
+
+Frame Rate:
+
+30 FPS
+60 FPS
+
+The application should automatically adjust quality depending on network performance.
+
+Webcam Streaming
+
+Every participant can optionally enable their webcam.
+
+Features:
+
+Enable webcam.
+Disable webcam.
+Switch between available cameras.
+Camera preview before enabling.
+HD video quality.
+Automatic bandwidth adaptation.
+Full-screen webcam view.
+Grid view for multiple webcams.
+Picture-in-picture mode while screen sharing (future).
+
+Quality Settings:
+
+Auto
+720p
+1080p
+
+Frame Rate:
+
+30 FPS
+60 FPS
+Audio Features
+
+The voice system should provide high-quality audio communication.
+
+Noise Suppression
+AI-powered background noise reduction.
+Removes keyboard sounds, mouse clicks, fans and ambient noise.
+Can be enabled or disabled.
+Echo Cancellation
+Prevents microphone echo and feedback.
+Enabled by default.
+Optional toggle.
+Automatic Gain Control (AGC)
+Automatically adjusts microphone volume.
+Prevents users from being too quiet or too loud.
+Voice Activity Detection (VAD)
+Automatically detects when a participant is speaking.
+Displays a speaking indicator.
+Push-To-Talk (PTT)
+Custom keyboard shortcut.
+Microphone transmits audio only while holding the assigned key.
+Microphone Test
+
+Users can:
+
+Test microphone.
+Hear microphone playback.
+View microphone input level.
+Speaker Test
+
+Users can test their speakers/headphones before joining.
+
+Device Selection
+
+Users can select:
+
+Microphone
+Speakers
+Headphones
+Camera
+
+Devices should automatically refresh when connected or disconnected.
+
+Individual User Volume
+
+Users can independently adjust the volume of every participant.
+
+These settings only affect the local client.
+
+Automatic Reconnection
+
+If the internet connection drops:
+
+Automatically reconnect.
+Restore microphone state.
+Restore speaker state.
+Rejoin the same voice channel.
+Waiting Room
+
+The channel owner may enable a Waiting Room.
+
+When enabled:
+
+Users cannot join immediately.
+Join requests appear to the owner.
+The owner can:
+Accept
+Reject
+Approved users enter the voice channel.
+Rejected users remain outside the channel.
+
+The owner can disable the Waiting Room at any time.
+
+Voice Channel Chat
+
+Every voice channel has its own dedicated text chat.
+
+Supported features:
+
+Text messages
+Emojis
+GIFs
+Images
+File uploads
+Replies
+Mentions
+Edit messages
+Delete messages
+
+Chat remains available while the voice channel exists.
+
+Ownership Transfer
+
+If the owner leaves while other participants remain connected:
+
+A confirmation dialog appears.
+The owner may manually select a new owner.
+If no owner is selected, ownership automatically transfers to the participant who has been connected the longest.
+The channel remains active.
+The new owner immediately receives full owner permissions.
+Channel Deletion
+
+When the last participant leaves:
+
+Display:
+
+Are you sure you want to delete this voice channel?
+
+No participants will remain connected. Deleting the channel will permanently remove it.
+
+Buttons:
+
+Delete Channel
+Cancel
+
+If confirmed:
+
+Delete the voice channel.
+Delete temporary channel data.
+Delete associated chat (optional).
+User Interface
+
+Every voice channel displays:
+
+Channel name
+Owner
+Number of participants
+Maximum participant limit
+Speaking indicators
+Muted users
+Deafened users
+Screen sharing indicator
+Webcam indicator
+Waiting Room status
+Private/Public status
+Real-Time Events
+
+The backend should synchronize in real time:
+
+User joined
+User left
+User muted
+User unmuted
+User deafened
+User undeafened
+User started speaking
+User stopped speaking
+Screen sharing started
+Screen sharing stopped
+Webcam enabled
+Webcam disabled
+Ownership transferred
+Channel renamed
+Channel locked
+Channel unlocked
+User kicked
+User banned
+Waiting Room request received
+Waiting Room request accepted
+Waiting Room request rejected
+Invite created
+Invite revoked
+Participant limit changed

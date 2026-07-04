@@ -1,0 +1,6 @@
+enum Role {
+    User
+    Vendor
+    Admin
+    SUPER_ADMIN
+}
