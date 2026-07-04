@@ -1,0 +1,84 @@
+model Challenge {
+  id          String              @id @default(uuid())
+  title       String              @db.VarChar(200)
+  description String?
+  difficulty  ChallengeDifficulty
+  type        String              @db.VarChar(50) // 'wins' | 'games_played' | 'custom'
+  total       Int
+  rewardPts   Int
+  xp          Int
+  isPremium   Boolean             @default(false)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  enrollments ChallengeEnrollment[]
+
+  @@map("challenges")
+}
+
+model ChallengeEnrollment {
+  id          String    @id @default(uuid())
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  progress  Int     @default(0)
+  completed Boolean @default(false)
+
+  enrolledAt  DateTime  @default(now())
+  completedAt DateTime?
+
+  @@unique([challengeId, userId])
+  @@map("challenge_enrollments")
+}
+
+model Reward {
+  id          String  @id @default(uuid())
+  title       String  @db.VarChar(200)
+  description String?
+  icon        String? @db.VarChar(10)
+  cost        Int
+  type        String  @db.VarChar(50)
+  active      Boolean @default(true)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime         @default(now())
+  purchases RewardPurchase[]
+
+  @@map("rewards")
+}
+
+model RewardPurchase {
+  id       String @id @default(uuid())
+  rewardId String
+  reward   Reward @relation(fields: [rewardId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  costPaid    Int
+  purchasedAt DateTime @default(now())
+
+  @@map("reward_purchases")
+}
+
+// Singleton-per-user row — upserted the same way commission rates are upserted
+model UserPoints {
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  balance     Int @default(0)
+  totalEarned Int @default(0)
+  level       Int @default(1)
+  xp          Int @default(0)
+
+  @@map("user_points")
+}

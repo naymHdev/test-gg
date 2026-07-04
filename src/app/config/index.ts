@@ -17,6 +17,13 @@ const jwt = {
   bcrypt_slot_rounds: process.env.BCRYPT_SALT_ROUNDS,
 };
 
+const redis = {
+  url: process.env.REDIS_URL || "redis://localhost:6379",
+  otp_ttl_seconds: Number(process.env.OTP_TTL_SECONDS) || 600, // 10 min
+  reset_token_ttl_seconds: Number(process.env.RESET_TOKEN_TTL_SECONDS) || 1800, // 30 min
+  presence_ttl_seconds: Number(process.env.PRESENCE_TTL_SECONDS) || 30,
+};
+
 const admin = {
   admin_email: process.env.ADMIN_EMAIL,
   admin_password: process.env.ADMIN_PASSWORD,
@@ -38,8 +45,17 @@ const stripe = {
   stripe_api_key: process.env.STRIPE_API_KEY,
   stripe_secret_key: process.env.STRIPE_SECRET_KEY,
   stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
-
   subscription_webhook_secret: process.env.STRIPE_SUBSCRIPTION_WEBHOOK_SECRET,
+};
+
+const rateLimits = {
+  login_per_min: 5,
+  otp_attempts: 5,
+  otp_lockout_minutes: 15,
+  posts_per_hour: 3,
+  reports_per_hour: 5,
+  messages_per_min: 30,
+  presign_per_hour: 10,
 };
 
 export default {
@@ -56,8 +72,10 @@ export default {
   bad_words_api_key: process.env.BAD_WORDS_API_KEY,
 
   jwt,
+  redis,
   aws,
   admin,
   nodemailer,
   stripe,
+  rateLimits,
 };

@@ -1,0 +1,16 @@
+model ActivityLog {
+  id String @id @default(uuid())
+
+  actorId String
+  actor   User   @relation(fields: [actorId], references: [id])
+
+  action     String @db.VarChar(100) // 'banned_user' | 'resolved_report' | ...
+  targetType String @db.VarChar(50)
+  targetId   String
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@map("activity_logs")
+}

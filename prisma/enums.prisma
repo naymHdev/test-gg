@@ -1,6 +1,194 @@
+// ===================== USER / AUTH =====================
+
 enum Role {
     User
-    Vendor
+    Moderator
     Admin
-    SUPER_ADMIN
+    Owner
+}
+
+enum AccountStatus {
+    Active
+    Warned
+    Suspended
+    Banned
+}
+
+enum Region {
+    EUW
+    EUNE
+    NA
+    KR
+    BR
+    LAN_LAS
+    OCE
+    TR
+    JP
+    ME_SEA
+}
+
+enum Language {
+    en
+    ro
+    pl
+    tr
+    fr
+    de
+    es
+    it
+    pt
+    ru
+    el
+    hu
+    cs
+    sk
+    nl
+    sv
+    da
+    no
+    fi
+    bg
+    uk
+    sr
+    hr
+    sl
+}
+
+enum Permission {
+    manage_users
+    ban_users
+    warn_users
+    timeout_users
+    delete_content
+    manage_posts
+    manage_reports
+    view_warnings
+    view_activity
+    view_support
+    view_banned
+    manage_tournaments
+    manage_challenges
+    manage_settings
+}
+
+// ===================== POSTS / MEDIA =====================
+
+enum PostType {
+    RankedSoloDuo
+    Clash
+    NormalDraft
+    ARAM
+    Custom
+    Flex
+}
+
+enum MediaCategory {
+    Screenshot
+    Clip
+    Meme
+}
+
+enum LikeType {
+    Like
+    Dislike
+}
+
+// ===================== TOURNAMENTS =====================
+
+enum TournamentFormat {
+    SingleElimination
+    RoundRobin
+}
+
+enum TournamentStatus {
+    Pending
+    Approved
+    RegistrationOpen
+    Active
+    Completed
+    Cancelled
+}
+
+enum TeamMemberRole {
+    Captain
+    Member
+}
+
+// ===================== CHALLENGES / REWARDS =====================
+
+enum ChallengeDifficulty {
+    Easy
+    Medium
+    Hard
+    Legendary
+}
+
+// ===================== FRIENDS / MESSAGES =====================
+
+enum FriendStatus {
+    Pending
+    Accepted
+    Blocked
+}
+
+// ===================== SUPPORT =====================
+
+enum SupportConversationStatus {
+    Open
+    Closed
+}
+
+enum SupportSenderType {
+    User
+    Support
+    System
+}
+
+// ===================== REPORTS =====================
+
+enum ReportTargetType {
+    Post
+    Profile
+    MediaPost
+}
+
+enum ReportStatus {
+    Pending
+    Resolved
+    Dismissed
+}
+
+// ===================== SUBSCRIPTION =====================
+
+enum SubscriptionStatus {
+    Active
+    Cancelled
+    Expired
+}
+
+enum SubscriptionPlan {
+    Monthly
+    Yearly
+}
+
+// ===================== WALLET =====================
+
+enum TransactionType {
+    Credit
+    Debit
+}
+
+// ===================== NOTIFICATIONS =====================
+
+enum NotificationType {
+    friend_request
+    friend_accepted
+    message_new
+    tournament_approved
+    tournament_winner
+    wallet_credited
+    challenge_completed
+    warning_issued
+    account_banned
+    report_resolved
 }

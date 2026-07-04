@@ -1,0 +1,33 @@
+model SupportConversation {
+  id         String                    @id @default(uuid())
+  userId     String
+  user       User                      @relation("SupportUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  status     SupportConversationStatus @default(Open)
+  openedAt   DateTime                  @default(now())
+  closedAt   DateTime?
+
+  closedById String?
+  closedBy   User?                     @relation("SupportClosedBy", fields: [closedById], references: [id])
+
+  messages   SupportMessage[]
+
+  @@index([userId, status])
+  @@map("support_conversations")
+}
+
+model SupportMessage {
+  id             String              @id @default(uuid())
+  conversationId String
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  senderId       String?
+  sender         User?               @relation(fields: [senderId], references: [id])
+  senderType     SupportSenderType
+
+  content        String
+  createdAt      DateTime            @default(now())
+
+  @@index([conversationId])
+  @@map("support_messages")
+}

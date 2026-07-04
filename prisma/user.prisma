@@ -1,0 +1,129 @@
+model User {
+    id           String        @id @default(uuid())
+    username     String        @unique
+    email        String        @unique
+    passwordHash String
+    role         Role          @default(User)
+    status       AccountStatus @default(Active)
+
+    region          Region
+    accountLanguage Language // immutable after registration
+    uiLanguage      Language @default(en)
+
+    isPremium      Boolean @default(false)
+    isRiotVerified Boolean @default(false)
+    riotAccount    Json?
+
+    warningCount Int       @default(0)
+    timeoutUntil DateTime?
+
+    banReason  String?
+    banDetails String?
+    bannedById String?
+    bannedBy   User?     @relation("BannedByAdmin", fields: [bannedById], references: [id])
+    bannedAt   DateTime?
+
+    agreedToTerms   Boolean @default(false)
+    agreedToPrivacy Boolean @default(false)
+
+    lastActiveAt DateTime?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    // relations
+    profile            Profile?
+    wallet             Wallet?
+    userPoints         UserPoints?
+    subscription       Subscription?
+    permissions        UserPermission[] @relation("UserPermissions")
+    grantedPermissions UserPermission[] @relation("GrantedByAdmin")
+    refreshTokens      RefreshToken[]
+    bannedUsers        User[]           @relation("BannedByAdmin")
+
+    posts         Post[]
+    mediaPosts    MediaPost[]
+    mediaComments MediaComment[]
+    mediaLikes    MediaLike[]
+
+    createdTournaments  Tournament[] @relation("TournamentCreator")
+    approvedTournaments Tournament[] @relation("TournamentApprover")
+    capturedTeams       Team[]       @relation("TeamCaptain")
+    teamMemberships     TeamMember[]
+    declaredMatches     Match[]      @relation("MatchDeclaredBy")
+
+    createdChallenges    Challenge[]
+    challengeEnrollments ChallengeEnrollment[]
+    createdRewards       Reward[]
+    rewardPurchases      RewardPurchase[]
+
+    friendsInitiated Friend[]  @relation("FriendInitiator")
+    friendsReceived  Friend[]  @relation("FriendTarget")
+    messagesSent     Message[] @relation("MessageSender")
+    messagesReceived Message[] @relation("MessageReceiver")
+
+    supportConversations SupportConversation[] @relation("SupportUser")
+    closedConversations  SupportConversation[] @relation("SupportClosedBy")
+    supportMessages      SupportMessage[]
+
+    reportsFiled    Report[] @relation("Reporter")
+    reportsReceived Report[] @relation("ReportedUser")
+    reportsResolved Report[] @relation("ReportResolver")
+
+    activityLogs ActivityLog[]
+
+    notifications Notification[]
+
+    @@index([region, accountLanguage])
+    @@map("users")
+}
+
+model Profile {
+    userId String @id
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    avatarUrl   String?
+    bannerUrl   String?
+    background  String?
+    borderStyle String?
+    nameColor   String?
+    bio         String?
+
+    rank               String?
+    lp                 Int?
+    tournamentEarnings Decimal @default(0) @db.Decimal(10, 2)
+
+    updatedAt DateTime @updatedAt
+
+    @@map("profiles")
+}
+
+// Granular moderator permissions (Owner-assigned)
+model UserPermission {
+    userId String
+    user   User   @relation("UserPermissions", fields: [userId], references: [id], onDelete: Cascade)
+
+    permission Permission
+
+    grantedById String
+    grantedBy   User     @relation("GrantedByAdmin", fields: [grantedById], references: [id])
+    grantedAt   DateTime @default(now())
+
+    @@id([userId, permission])
+    @@map("user_permissions")
+}
+
+// Refresh tokens persisted for rotation + logout invalidation (auth.middleware pattern
+// verifies against DB the same way `auth.ts` checks isActive/isDeleted for the awa-test repo)
+model RefreshToken {
+    id     String @id @default(uuid())
+    userId String
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    token     String    @unique
+    expiresAt DateTime
+    createdAt DateTime  @default(now())
+    revokedAt DateTime?
+
+    @@index([userId])
+    @@map("refresh_tokens")
+}

@@ -1,0 +1,57 @@
+model MediaPost {
+  id          String         @id @default(uuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String         @db.VarChar(200)
+  description String?
+  imageUrl    String
+  category    MediaCategory
+  language    Language
+
+  likesCount    Int          @default(0)
+  dislikesCount Int          @default(0)
+  views         Int          @default(0)
+  isPremium     Boolean      @default(false)
+
+  comments    MediaComment[]
+  likes       MediaLike[]
+  reports     Report[]
+
+  createdAt   DateTime       @default(now())
+  deletedAt   DateTime?
+
+  @@index([category, language, deletedAt])
+  @@map("media_posts")
+}
+
+model MediaComment {
+  id          String    @id @default(uuid())
+  mediaPostId String
+  mediaPost   MediaPost @relation(fields: [mediaPostId], references: [id], onDelete: Cascade)
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content     String    @db.VarChar(300)
+  createdAt   DateTime  @default(now())
+
+  @@index([mediaPostId])
+  @@map("media_comments")
+}
+
+// Composite PK enforces "one like/dislike per user per post" — service layer
+// upserts here instead of insert, mirroring the singleton-upsert pattern
+// already used for commission-rate management.
+model MediaLike {
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  mediaPostId String
+  mediaPost   MediaPost @relation(fields: [mediaPostId], references: [id], onDelete: Cascade)
+
+  type        LikeType
+
+  @@id([userId, mediaPostId])
+  @@map("media_likes")
+}

@@ -1,0 +1,35 @@
+model Report {
+  id             String           @id @default(uuid())
+
+  reporterId     String
+  reporter       User             @relation("Reporter", fields: [reporterId], references: [id])
+
+  reportedUserId String
+  reportedUser   User             @relation("ReportedUser", fields: [reportedUserId], references: [id])
+
+  targetType     ReportTargetType
+  targetId       String
+
+  // polymorphic soft-links, resolved in service layer based on targetType — kept
+  // nullable+optional relations so a Post OR a MediaPost report can point here
+  postId         String?
+  post           Post?            @relation(fields: [postId], references: [id])
+  mediaPostId    String?
+  mediaPost      MediaPost?       @relation(fields: [mediaPostId], references: [id])
+
+  reason         String           @db.VarChar(100)
+  details        String                              // mandatory, min 10 chars (validated in Zod layer)
+
+  status         ReportStatus     @default(Pending)
+
+  resolvedById   String?
+  resolvedBy     User?            @relation("ReportResolver", fields: [resolvedById], references: [id])
+  resolvedAt     DateTime?
+
+  snapshot       Json?                                // content snapshot at time of report
+
+  createdAt      DateTime         @default(now())
+
+  @@index([status, reportedUserId])
+  @@map("reports")
+}

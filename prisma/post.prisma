@@ -1,0 +1,29 @@
+model Post {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  region         Region
+  content        String    @db.VarChar(500)
+  imageUrl       String?
+  language       Language                     // snapshot of user.accountLanguage, immutable
+
+  tags           Json?                        // [{ text, bg, color }]
+  types          PostType[]
+  ranks          String[]
+  roles          String[]
+
+  isVerified     Boolean   @default(false)     // snapshot of user.isRiotVerified at post time
+  isPremium      Boolean   @default(false)      // snapshot of user.isPremium at post time
+  trophyEarnings Decimal   @default(0) @db.Decimal(10, 2)
+
+  reports        Report[]
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  @@index([region, language, deletedAt])
+  @@index([createdAt])
+  @@map("posts")
+}
