@@ -1,153 +1,68 @@
-import { JwtPayload } from "jsonwebtoken";
-import jwt, { Secret } from "jsonwebtoken";
 import httpStatus from "http-status";
-import { prisma } from "../../../shared/prisma";
+import otpGenerator from "otp-generator";
 import AppError from "../../error/AppError";
 import config from "../../config";
-import moment from "moment";
-import { generateOtp } from "../../utils/otpGenerator";
-import { sendEmail } from "../../utils/mailSender";
+import { redis } from "../../../shared/redis";
+import { sendOtpEmail } from "../../utils/mailSender";
 
-const verifyOtp = async (token: string, otp: string | number) => {
-  if (!token) {
-    throw new AppError(httpStatus.UNAUTHORIZED, "You are not authorized");
-  }
-  let decode;
+const otpKey = (email: string) => `otp:${email}`;
+const attemptsKey = (email: string) => `otp:attempts:${email}`;
+const lockKey = (email: string) => `otp:lock:${email}`;
 
-  try {
-    decode = jwt.verify(
-      token,
-      config.jwt.access_secret as Secret,
-    ) as JwtPayload;
-  } catch (err) {
-    throw new AppError(
-      httpStatus.FORBIDDEN,
-      "Session has expired. Please try to submit OTP within 5 minute",
-    );
-  }
-
-  const user = await prisma.user.findFirst({
-    where: { id: decode?.userId },
-    include: { auth: true },
+/** Generates a 6-digit OTP, stores it in Redis (10min TTL), emails it. */
+const sendOtp = async (email: string) => {
+  const otp = otpGenerator.generate(6, {
+    upperCaseAlphabets: false,
+    specialChars: false,
+    lowerCaseAlphabets: false,
   });
 
-  if (!user || !user?.auth) {
-    throw new AppError(httpStatus.BAD_REQUEST, "User not found");
-  }
-  if (new Date() > user?.auth?.expiredAt) {
-    throw new AppError(
-      httpStatus.FORBIDDEN,
-      "OTP has expired. Please resend it",
-    );
-  }
+  await redis.set(otpKey(email), otp, "EX", config.redis.otp_ttl_seconds);
+  await redis.del(attemptsKey(email)); // fresh attempt counter per new OTP
+  await sendOtpEmail(email, otp);
 
-  if (user?.auth?.otp_status) {
-    throw new AppError(
-      httpStatus.BAD_REQUEST,
-      "You already verified, need to login",
-    );
-  }
-
-  if (otp !== user?.auth?.otp) {
-    throw new AppError(httpStatus.BAD_REQUEST, "OTP did not match");
-  }
-
-  const updateUser = await prisma.user.update({
-    where: { id: user?.id },
-    data: {
-      auth: {
-        update: {
-          data: {
-            otp: "0",
-            expiredAt: moment().add(5, "minute").toDate(),
-            otp_status: true,
-            isVerified: true,
-          },
-        },
-      },
-    },
-  });
-
-  const jwtPayload = {
-    role: user?.auth?.role,
-    userId: updateUser?.id,
-  };
-
-  const accessToken = jwt.sign(jwtPayload, config.jwt.access_secret as Secret, {
-    expiresIn: "7d", //7 days
-  });
-
-  return { user: user, accessToken: accessToken };
+  return { sentTo: email, expiresInSeconds: config.redis.otp_ttl_seconds };
 };
 
+/** Re-issues an OTP, invalidating whatever was previously stored (SRS §4.1 edge case). */
 const resendOtp = async (email: string) => {
-  const user = await prisma.user.findFirst({
-    where: { email },
-    include: { auth: true },
-  });
-
-  if (!user) {
-    throw new AppError(httpStatus.BAD_REQUEST, "User not found");
-  }
-
-  const otp = generateOtp();
-  const expiresAt = moment().add(5, "minute").toDate();
-
-  const updateOtp = await prisma.user.update({
-    where: { id: user?.id },
-    data: {
-      auth: {
-        update: {
-          data: {
-            otp,
-            expiredAt: expiresAt,
-            otp_status: false,
-          },
-        },
-      },
-    },
-  });
-
-  if (!updateOtp) {
+  const locked = await redis.get(lockKey(email));
+  if (locked) {
     throw new AppError(
-      httpStatus.BAD_REQUEST,
-      "Failed to resend OTP. Please try again later",
+      httpStatus.TOO_MANY_REQUESTS,
+      "Too many failed attempts. Try again after 15 minutes.",
+    );
+  }
+  return sendOtp(email);
+};
+
+/** Verifies OTP, tracks failed attempts, applies 15-min lockout after 5 failures. */
+const verifyOtp = async (email: string, submittedOtp: string) => {
+  const locked = await redis.get(lockKey(email));
+  if (locked) {
+    throw new AppError(
+      httpStatus.TOO_MANY_REQUESTS,
+      "Too many failed attempts. Try again after 15 minutes.",
     );
   }
 
-  const jwtPayload = {
-    userId: user?.id,
-    role: user?.auth?.role,
-  };
-  const token = jwt.sign(jwtPayload, config.jwt.access_secret as Secret, {
-    expiresIn: "3m",
-  });
-
-  if (user) {
-    const emailTemplate = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-      <h2 style="color: #1a73e8;">Email Verification</h2>
-      <p>Hi ${user.name || "there"},</p>
-      <p>Your One-Time Password (OTP) is:</p>
-      <p style="font-size: 24px; font-weight: bold; color: #1a73e8;">{{otp}}</p>
-      <p>This OTP will expire in 5 minutes. Do not share it with anyone.</p>
-      <p>If you did not request this, you can safely ignore this email.</p>
-      <br>
-      <p>Best regards,<br>Your Company Name</p>
-    </div>
-  `;
-
-    await sendEmail(
-      user.email,
-      "Your One-Time OTP",
-      emailTemplate.replace("{{otp}}", otp),
-    );
+  const storedOtp = await redis.get(otpKey(email));
+  if (!storedOtp) {
+    throw new AppError(httpStatus.BAD_REQUEST, "OTP expired or not found");
   }
 
-  return token;
+  if (storedOtp !== submittedOtp) {
+    const attempts = await redis.incr(attemptsKey(email));
+    if (attempts >= 5) {
+      await redis.set(lockKey(email), "1", "EX", 15 * 60);
+      await redis.del(attemptsKey(email));
+    }
+    throw new AppError(httpStatus.BAD_REQUEST, "Invalid OTP");
+  }
+
+  await redis.del(otpKey(email));
+  await redis.del(attemptsKey(email));
+  return true;
 };
 
-export const otpService = {
-  verifyOtp,
-  resendOtp,
-};
+export const otpService = { sendOtp, resendOtp, verifyOtp };

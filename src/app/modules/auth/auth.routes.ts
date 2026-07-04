@@ -1,49 +1,57 @@
 import { Router } from "express";
 import { authController } from "./auth.controller";
-import validateRequest from "../../middleware/validateRequest";
 import { authValidation } from "./auth.validation";
+import validateRequest from "../../middleware/validateRequest";
 import auth from "../../middleware/auth";
+import { rateLimiter } from "../../middleware/rateLimiter";
 import { Role } from "../../../../generated/prisma/enums";
 
 const router = Router();
 
 router.post(
-  "/create-account",
-  validateRequest(authValidation.accountCreateValidation),
-  authController.createAccount,
+  "/register",
+  validateRequest(authValidation.registerValidation),
+  authController.register,
+);
+
+router.post(
+  "/verify-otp",
+  validateRequest(authValidation.verifyOtpValidation),
+  authController.verifyOtp,
 );
 
 router.post(
   "/login",
+  rateLimiter.login,
   validateRequest(authValidation.loginValidation),
-  authController.accountLogin,
+  authController.login,
 );
 
+router.post("/logout", authController.logout);
+router.post("/refresh", authController.refresh);
+
 router.post(
-  "/change-password",
-  auth(Role.Admin, Role.SUPER_ADMIN, Role.Vendor, Role.User),
-  validateRequest(authValidation.changedPasswordValidation),
-  authController.changePassword,
+  "/forgot-password",
+  validateRequest(authValidation.forgotPasswordValidation),
+  authController.forgotPassword,
 );
 
-router.post("/forgot-password", authController.forgotPassword);
-router.post("/reset-password", authController.resetPassword);
-router.post("/refresh-token", authController.refreshToken);
-
-router.post("/social-login", authController.socialLogin);
-
-// Switch account (User ↔ Vendor)
-router.post(
-  "/switch-account",
-  auth(Role.User, Role.Vendor),
-  authController.switchAccount,
+router.put(
+  "/reset-password",
+  validateRequest(authValidation.resetPasswordValidation),
+  authController.resetPassword,
 );
 
-// Vendor upgrade request
-router.post(
-  "/upgrade-to-vendor",
-  auth(Role.User),
-  authController.upgradeToVendor,
+// "which devices am I logged in on" + force-logout a specific one
+router.get(
+  "/sessions",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  authController.getSessions,
+);
+router.delete(
+  "/sessions/:id",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  authController.revokeSession,
 );
 
 export const authRoutes = router;

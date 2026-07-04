@@ -1,136 +1,143 @@
+import httpStatus from "http-status";
 import catchAsync from "../../utils/catchAsync";
 import sendResponse from "../../utils/sendResponse";
-import httpStatus from "http-status";
-import { authService } from "./auth.service";
-import { otpService } from "../otp/otp.service";
 import AppError from "../../error/AppError";
+import { authService } from "./auth.service";
+import { extractDeviceMeta } from "../../helpers/deviceMeta";
 
-const createAccount = catchAsync(async (req, res) => {
-  // console.log(req.body);
-  const result = await authService.createAccountIntoDB(req.body);
+const register = catchAsync(async (req, res) => {
+  const result = await authService.registerIntoDB(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "OTP sent to your email",
+    data: result,
+  });
+});
 
-  let otpToken;
-  if (!result?.auth?.isVerified) {
-    otpToken = await otpService.resendOtp(result?.email!);
+const verifyOtp = catchAsync(async (req, res) => {
+  // purpose distinguishes register-flow vs login-flow OTP verification
+  const { pendingToken, otp, purpose, stayLoggedIn } = req.body;
+  const deviceMeta = extractDeviceMeta(req);
+
+  const result =
+    purpose === "login"
+      ? await authService.verifyLoginOtp(
+          pendingToken,
+          otp,
+          !!stayLoggedIn,
+          deviceMeta,
+        )
+      : await authService.verifyRegisterOtp(pendingToken, otp, deviceMeta);
+
+  setRefreshCookie(res, result.refreshToken);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Verified successfully",
+    data: { accessToken: result.accessToken },
+  });
+});
+
+const login = catchAsync(async (req, res) => {
+  const result = await authService.loginWithCredentials(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "OTP sent to your email",
+    data: result,
+  });
+});
+
+const refresh = catchAsync(async (req, res) => {
+  const token = req.cookies?.["refresh-token"] || req.body?.refreshToken;
+  if (!token) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Refresh token is required");
   }
-
+  const deviceMeta = extractDeviceMeta(req);
+  const result = await authService.refreshAccessToken(token, deviceMeta);
+  setRefreshCookie(res, result.refreshToken);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Account created successfully",
-    data: { otpToken },
+    message: "Token refreshed",
+    data: { accessToken: result.accessToken },
   });
 });
 
-const accountLogin = catchAsync(async (req, res) => {
-  const result = await authService.accountLoginFromDB(req.body);
+const logout = catchAsync(async (req, res) => {
+  const token = req.cookies?.["refresh-token"] || req.body?.refreshToken;
+  if (token) await authService.logout(token);
+  res.clearCookie("refresh-token");
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "You are logged in successfully",
-    data: result,
-  });
-});
-
-const changePassword = catchAsync(async (req, res) => {
-  const result = await authService.changePasswordFromDB(
-    // @ts-ignore
-    req.user?.id!,
-    req.body,
-  );
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Password changed successfully",
-    data: result,
+    message: "Logged out",
+    data: null,
   });
 });
 
 const forgotPassword = catchAsync(async (req, res) => {
-  const result = await authService.forgotPassword(req.body.email!);
+  await authService.forgotPassword(req.body.email);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Password reset link sent successfully",
-    data: result,
+    message: "If the email exists, a reset link has been sent",
+    data: null,
   });
 });
 
 const resetPassword = catchAsync(async (req, res) => {
-  const token = req?.headers?.authorization?.split(" ")[1];
-
-  const result = await authService.resetPassword(token as string, req.body);
+  await authService.resetPassword(req.body.token, req.body.newPassword);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Password reset successfully",
-    data: result,
+    data: null,
   });
 });
 
-const refreshToken = catchAsync(async (req, res) => {
-  const token = req.cookies?.["refresh-token"] || req.body?.refreshToken;
-  console.log("token____", token);
-
-  if (!token) {
-    throw new AppError(httpStatus.BAD_REQUEST, "Refresh token is required");
-  }
-
-  const result = await authService.refreshToken(token);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Token refresh successfully",
-    data: result,
+// HttpOnly cookie, matches the `refresh-token` cookie name already used in refreshToken()
+function setRefreshCookie(res: any, token: string) {
+  res.cookie("refresh-token", token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
   });
-});
+}
 
-const socialLogin = catchAsync(async (req, res) => {
-  const result = await authService.socialLogin(req.body);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Social login successfully",
-    data: result,
-  });
-});
-
-const switchAccount = catchAsync(async (req, res) => {
+const getSessions = catchAsync(async (req, res) => {
   // @ts-ignore
-  const userId = req.user?.id!;
-  const { targetRole } = req.body;
-
-  const result = await authService.switchAccount(userId, targetRole);
+  const userId = req.user.id;
+  const result = await authService.getActiveSessions(userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: `Switched to ${targetRole} account successfully`,
+    message: "Active sessions retrieved",
     data: result,
   });
 });
 
-const upgradeToVendor = catchAsync(async (req, res) => {
+const revokeSession = catchAsync(async (req, res) => {
   // @ts-ignore
-  const userId = req.user?.id!;
-
-  const result = await authService.upgradeToVendor(userId);
+  const userId = req.user.id;
+  await authService.revokeSession(userId, req.params.id as string);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Vendor access granted successfully",
-    data: result,
+    message: "Session logged out",
+    data: null,
   });
 });
 
 export const authController = {
-  createAccount,
-  accountLogin,
-  changePassword,
+  register,
+  verifyOtp,
+  login,
+  refresh,
+  logout,
   forgotPassword,
   resetPassword,
-  refreshToken,
-  socialLogin,
-
-  switchAccount,
-  upgradeToVendor,
+  getSessions,
+  revokeSession,
 };

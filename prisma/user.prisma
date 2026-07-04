@@ -112,8 +112,6 @@ model UserPermission {
     @@map("user_permissions")
 }
 
-// Refresh tokens persisted for rotation + logout invalidation (auth.middleware pattern
-// verifies against DB the same way `auth.ts` checks isActive/isDeleted for the awa-test repo)
 model RefreshToken {
     id     String @id @default(uuid())
     userId String
@@ -123,6 +121,12 @@ model RefreshToken {
     expiresAt DateTime
     createdAt DateTime  @default(now())
     revokedAt DateTime?
+
+    ipAddress  String?
+    userAgent  String? // raw UA string, kept for audit/debug
+    deviceName String? // parsed e.g. "Chrome on Windows", "iPhone App"
+    deviceType String? // 'mobile' | 'desktop' | 'tablet'
+    lastUsedAt DateTime @default(now()) // bumped on every /refresh call
 
     @@index([userId])
     @@map("refresh_tokens")

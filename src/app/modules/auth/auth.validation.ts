@@ -1,41 +1,96 @@
-import z from "zod";
+import { z } from "zod";
 
-const accountCreateValidation = z.object({
-  name: z
-    .string({ message: "Name is required" })
-    .min(2, { message: "Name must be at least 2 characters" })
-    .max(100, { message: "Name is too long" }),
+const registerValidation = z.object({
+  username: z
+    .string({ message: "Username is required" })
+    .min(3)
+    .max(20)
+    .regex(/^[a-zA-Z0-9_]+$/, "Only letters, numbers and underscore allowed"),
 
-  email: z
-    .string({ message: "Email is required" })
-    .email({ message: "Invalid email address" }),
-
-  password: z
-    .string({ message: "Password is required" })
-    .min(6, { message: "Password must be at least 6 characters" })
-    .max(50, { message: "Password is too long" }),
-  role: z.enum(["Admin", "SuperAdmin", "Vendor", "User"]).default("User"),
-});
-
-const accountLoginValidation = z.object({
-  email: z
-    .string({ message: "Email is required" })
-    .email({ message: "Invalid email address" }),
+  email: z.string({ message: "Email is required" }).email(),
 
   password: z
     .string({ message: "Password is required" })
-    .min(6, { message: "Password must be at least 6 characters" })
-    .max(50, { message: "Password is too long" }),
+    .min(8)
+    .regex(/[A-Z]/, "Must contain at least 1 uppercase letter")
+    .regex(/[0-9]/, "Must contain at least 1 number"),
+
+  region: z.enum([
+    "EUW",
+    "EUNE",
+    "NA",
+    "KR",
+    "BR",
+    "LAN_LAS",
+    "OCE",
+    "TR",
+    "JP",
+    "ME_SEA",
+  ]),
+
+  language: z.enum([
+    "en",
+    "ro",
+    "pl",
+    "tr",
+    "fr",
+    "de",
+    "es",
+    "it",
+    "pt",
+    "ru",
+    "el",
+    "hu",
+    "cs",
+    "sk",
+    "nl",
+    "sv",
+    "da",
+    "no",
+    "fi",
+    "bg",
+    "uk",
+    "sr",
+    "hr",
+    "sl",
+  ]),
+
+  agreedToTerms: z.literal(true, {
+    message: "You must agree to the Terms of Service",
+  }),
+  agreedToPrivacy: z.literal(true, {
+    message: "You must agree to the Privacy Policy",
+  }),
 });
 
-const changedPasswordValidation = z.object({
-  oldPassword: z.string({ message: "Old password is required" }),
-  newPassword: z.string({ message: "New password is required" }).min(6),
-  confirmPassword: z.string({ message: "Confirm password is required" }).min(6),
+const loginValidation = z.object({
+  email: z.string({ message: "Email is required" }).email(),
+  password: z.string({ message: "Password is required" }),
+  stayLoggedIn: z.boolean().default(false),
+});
+
+const verifyOtpValidation = z.object({
+  pendingToken: z.string({ message: "pendingToken is required" }),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+});
+
+const forgotPasswordValidation = z.object({
+  email: z.string({ message: "Email is required" }).email(),
+});
+
+const resetPasswordValidation = z.object({
+  token: z.string({ message: "Reset token is required" }),
+  newPassword: z
+    .string({ message: "New password is required" })
+    .min(8)
+    .regex(/[A-Z]/)
+    .regex(/[0-9]/),
 });
 
 export const authValidation = {
-  accountCreateValidation,
-  loginValidation: accountLoginValidation,
-  changedPasswordValidation,
+  registerValidation,
+  loginValidation,
+  verifyOtpValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
 };

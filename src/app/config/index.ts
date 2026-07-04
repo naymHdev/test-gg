@@ -1,20 +1,15 @@
 import dotenv from "dotenv";
 import path from "path";
-dotenv.config({ path: path.join((process.cwd(), ".env")) });
-
-const aws = {
-  region: process.env.AWS_REGION,
-  accessKeyId: process.env.S3_BUCKET_ACCESS_KEY,
-  secretAccessKey: process.env.S3_BUCKET_SECRET_ACCESS_KEY,
-  bucket: process.env.AWS_BUCKET_NAME,
-};
+dotenv.config({ path: path.join(process.cwd(), ".env") });
 
 const jwt = {
   access_secret: process.env.JWT_ACCESS_SECRET,
   refresh_secret: process.env.JWT_REFRESH_SECRET,
-  access_expires_in: process.env.JWT_ACCESS_EXPIRES_IN,
-  refresh_expires_in: process.env.JWT_REFRESH_EXPIRES_IN,
-  bcrypt_slot_rounds: process.env.BCRYPT_SALT_ROUNDS,
+  pending_secret: process.env.JWT_PENDING_SECRET, // short-lived token between OTP steps
+  access_expires_in: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+  refresh_expires_in_default: process.env.JWT_REFRESH_EXPIRES_IN || "24h", // stayLoggedIn=false
+  refresh_expires_in_extended: process.env.JWT_REFRESH_EXPIRES_IN_EXT || "30d", // stayLoggedIn=true
+  bcrypt_salt_rounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 12,
 };
 
 const redis = {
@@ -24,10 +19,11 @@ const redis = {
   presence_ttl_seconds: Number(process.env.PRESENCE_TTL_SECONDS) || 30,
 };
 
-const admin = {
-  admin_email: process.env.ADMIN_EMAIL,
-  admin_password: process.env.ADMIN_PASSWORD,
-  phone_number: process.env.ADMIN_PHONE_NUMBER,
+const aws = {
+  region: process.env.AWS_REGION,
+  accessKeyId: process.env.S3_BUCKET_ACCESS_KEY,
+  secretAccessKey: process.env.S3_BUCKET_SECRET_ACCESS_KEY,
+  bucket: process.env.AWS_BUCKET_NAME,
 };
 
 const nodemailer = {
@@ -42,10 +38,8 @@ const nodemailer = {
 };
 
 const stripe = {
-  stripe_api_key: process.env.STRIPE_API_KEY,
-  stripe_secret_key: process.env.STRIPE_SECRET_KEY,
-  stripe_webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
-  subscription_webhook_secret: process.env.STRIPE_SUBSCRIPTION_WEBHOOK_SECRET,
+  secret_key: process.env.STRIPE_SECRET_KEY,
+  webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
 };
 
 const rateLimits = {
@@ -60,21 +54,18 @@ const rateLimits = {
 
 export default {
   node_env: process.env.NODE_ENV,
-
-  port: process.env.PORT,
+  port: process.env.PORT || 5000,
   socket_port: process.env.SOCKET_PORT,
+  ip: process.env.IP || "localhost",
 
-  ip: process.env.IP,
   database_url: process.env.DATABASE_URL,
   server_url: process.env.SERVER_URL,
-  client_url: process.env.CLIENT_URL,
-
-  bad_words_api_key: process.env.BAD_WORDS_API_KEY,
+  client_url: process.env.CLIENT_URL, // web app origin
+  dashboard_url: process.env.DASHBOARD_URL, // owner/admin panel origin
 
   jwt,
   redis,
   aws,
-  admin,
   nodemailer,
   stripe,
   rateLimits,

@@ -1,653 +1,290 @@
-import httpStatus from "http-status";
-import { prisma } from "../../../shared/prisma";
-import AppError from "../../error/AppError";
 import bcrypt from "bcrypt";
+import httpStatus from "http-status";
+import { v4 as uuidv4 } from "uuid";
+import AppError from "../../error/AppError";
 import config from "../../config";
-import { Role, User } from "../../../../generated/prisma/client";
-import { createToken, verifyToken } from "./auth.utils";
-import { generateOtp } from "../../utils/otpGenerator";
-import moment from "moment";
-import jwt, { JwtPayload, Secret } from "jsonwebtoken";
-import { sendEmail } from "../../utils/mailSender";
-import { SocialLoginPayload } from "./auth.interface";
+import { prisma } from "../../../shared/prisma";
+import { redis } from "../../../shared/redis";
+import { otpService } from "../otp/otp.service";
+import { authUtils } from "./auth.utils";
+import { sendResetPasswordEmail } from "../../utils/mailSender";
+import { TLoginInput, TRegisterInput } from "./auth.interface";
+import { TDeviceMeta } from "../../helpers/deviceMeta";
 
-const createAccountIntoDB = async (
-  payload: Omit<User, "id" | "createdAt" | "updatedAt"> & {
-    password: string;
-    role: Role;
-  },
-) => {
-  const { name, email, password, role } = payload;
-  const existAccount = await prisma.user.findFirst({
-    where: { email },
-    include: { auth: true },
-  });
+const pendingRegKey = (email: string) => `pending_registration:${email}`;
+const resetTokenKey = (token: string) => `reset_token:${token}`;
 
-  if (existAccount && existAccount.auth?.isVerified) {
-    throw new AppError(
-      httpStatus.CONFLICT,
-      "Account already exists with this email",
-    );
+// ---------------------------------------------------------------- Register
+const registerIntoDB = async (payload: TRegisterInput) => {
+  const [usernameTaken, emailTaken] = await Promise.all([
+    prisma.user.findFirst({
+      where: { username: { equals: payload.username, mode: "insensitive" } },
+    }),
+    prisma.user.findUnique({ where: { email: payload.email } }),
+  ]);
+
+  if (usernameTaken) {
+    throw new AppError(httpStatus.CONFLICT, "USERNAME_TAKEN");
+  }
+  if (emailTaken) {
+    throw new AppError(httpStatus.CONFLICT, "EMAIL_TAKEN");
   }
 
-  const hashedPassword = await bcrypt.hash(
-    password,
-    Number(config.jwt.bcrypt_slot_rounds!),
+  const passwordHash = await bcrypt.hash(
+    payload.password,
+    config.jwt.bcrypt_salt_rounds,
   );
 
-  const account = await prisma.user.upsert({
-    where: { email: email! },
+  // Stash the not-yet-persisted account in Redis until OTP is confirmed —
+  // avoids creating a half-verified User row (mirrors the seedAdmin-style
+  // "don't write to DB until state is final" habit).
+  await redis.set(
+    pendingRegKey(payload.email),
+    JSON.stringify({ ...payload, passwordHash }),
+    "EX",
+    900, // 15 min, matches pendingToken TTL
+  );
 
-    update: {
-      name,
-      email,
-      auth: {
-        upsert: {
-          update: {
-            email: email!,
-            password: hashedPassword,
-          },
-          create: {
-            role,
-            email: email!,
-            password: hashedPassword,
-          },
-        },
-      },
-    },
+  await otpService.sendOtp(payload.email);
+  const pendingToken = authUtils.signPendingToken({ email: payload.email });
 
-    create: {
-      name,
-      email,
-      auth: {
-        create: {
-          role,
-          email: email!,
-          password: hashedPassword,
-        },
-      },
-    },
-
-    include: {
-      auth: true,
-    },
-  });
-
-  return account;
+  return { pendingToken };
 };
 
-const accountLoginFromDB = async (payload: {
-  email: string;
-  password: string;
-  fcmToken?: string;
-}) => {
-  const user = await prisma.user.findFirst({
-    where: {
-      email: payload?.email,
-      isGuest: false,
-    },
-    include: { auth: true },
-  });
-
-  if (!user) {
-    // If user not found, throw error
-    throw new AppError(httpStatus.NOT_FOUND, "Account not found");
-  } else {
-    if (!user?.auth?.isActive) {
-      throw new AppError(httpStatus.FORBIDDEN, "Your account is blocked");
-    }
-
-    if (user?.auth?.isDeleted) {
-      throw new AppError(
-        httpStatus.FORBIDDEN,
-        "Your account is deleted, contact admin",
-      );
-    }
-
-    if (!user?.auth?.isVerified) {
-      throw new AppError(
-        httpStatus.BAD_REQUEST,
-        "Your account is not verified",
-      );
-    }
-
-    // Handle verify password
-    const passwordMatched = await bcrypt.compare(
-      payload?.password,
-      user?.auth?.password,
-    );
-
-    if (!passwordMatched) {
-      throw new AppError(
-        httpStatus.BAD_REQUEST,
-        "Please check your credentials and try again",
-      );
-    }
-
-    // Update FCM token if provided
-    let updatedUser = user as User;
-    if (payload?.fcmToken) {
-      updatedUser = await prisma.user.update({
-        where: { email: payload?.email },
-        data: { fcmToken: payload.fcmToken },
-      });
-    }
-  }
-
-  //update last login time
-  await prisma.auth.update({
-    where: { userId: user?.id },
-    data: { last_login: new Date() },
-  });
-
-  const jwtPayload: { userId: string; role: Role; email: string } = {
-    userId: user?.id as string,
-    role: user?.auth?.role,
-    email: user.email,
-  };
-
-  const role = user?.auth?.role;
-  const roles = user?.auth?.roles;
-  // console.log({ roles });
-
-  const userDoc = user as any;
-  delete userDoc.auth;
-
-  const accessToken = createToken(
-    jwtPayload,
-    config.jwt.access_secret as string,
-    60 * 60 * 24 * 7, //7 days
-  );
-
-  const refreshToken = createToken(
-    jwtPayload,
-    config.jwt.refresh_secret as string,
-    60 * 60 * 24 * 30, // 30 days
-  );
-
-  return {
-    user: { ...userDoc, role, roles },
-    accessToken,
-    refreshToken,
-  };
-};
-
-// Change password
-const changePasswordFromDB = async (
-  id: string,
-  payload: {
-    oldPassword: string;
-    newPassword: string;
-    confirmPassword: string;
-  },
+// ------------------------------------------------------- Verify Register OTP
+const verifyRegisterOtp = async (
+  pendingToken: string,
+  otp: string,
+  deviceMeta: TDeviceMeta,
 ) => {
-  const user = await prisma.user.findFirst({
-    where: { id },
-    include: { auth: true },
-  });
+  const { email } = authUtils.verifyPendingToken(pendingToken);
 
-  if (!user) {
-    throw new AppError(httpStatus.NOT_FOUND, "User not found");
-  }
+  await otpService.verifyOtp(email, otp);
 
-  const passwordMatched = await bcrypt.compare(
-    payload?.oldPassword,
-    user?.auth?.password as string,
-  );
-
-  if (!passwordMatched) {
-    throw new AppError(httpStatus.FORBIDDEN, "Old password does not match");
-  }
-  if (payload?.newPassword !== payload?.confirmPassword) {
+  const raw = await redis.get(pendingRegKey(email));
+  if (!raw) {
     throw new AppError(
       httpStatus.BAD_REQUEST,
-      "New password and confirm password do not match",
+      "Registration session expired, please register again",
     );
   }
+  const pending = JSON.parse(raw);
 
-  const hashedPassword = await bcrypt.hash(
-    payload?.newPassword,
-    Number(config.jwt.bcrypt_slot_rounds!),
-  );
-
-  const result = await prisma.user.update({
-    where: { id },
-    data: {
-      auth: {
-        update: {
-          data: {
-            password: hashedPassword,
-            passwordChangedAt: new Date(),
-          },
-        },
+  const user = await prisma.$transaction(async (tx: any) => {
+    const created = await tx.user.create({
+      data: {
+        username: pending.username,
+        email: pending.email,
+        passwordHash: pending.passwordHash,
+        region: pending.region,
+        accountLanguage: pending.language,
+        agreedToTerms: pending.agreedToTerms,
+        agreedToPrivacy: pending.agreedToPrivacy,
+        profile: { create: {} },
+        wallet: { create: {} },
+        userPoints: { create: {} },
       },
-    },
+    });
+    return created;
   });
 
-  return result;
+  await redis.del(pendingRegKey(email));
+
+  return issueTokenPair(user.id, user.role, false, deviceMeta);
 };
 
-const forgotPassword = async (email: string) => {
-  const user = await prisma.user.findFirst({
-    where: { email },
-    include: { auth: true },
-  });
-
-  if (!user) {
-    throw new AppError(httpStatus.NOT_FOUND, "User not found");
-  }
-
-  const jwtPayload = {
-    userId: user?.id,
-    role: user?.auth?.role,
-  };
-
-  const token = jwt.sign(jwtPayload, config.jwt.access_secret as Secret, {
-    expiresIn: "5m",
-  });
-
-  const currentTime = new Date();
-  const otp = generateOtp();
-  const expiresAt = moment(currentTime).add(5, "minute").toDate();
-
-  await prisma.user.update({
-    where: { id: user?.id },
-    data: {
-      auth: {
-        update: {
-          otp,
-          expiredAt: expiresAt,
-          otp_status: false,
-        },
-      },
-    },
-  });
-
-  // ---------- Send Forgot Password OTP ----------
-  const emailTemplate = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; color: #333;">
-      <h2 style="color: #e53935;">Reset Your Password</h2>
-
-      <p>Hello ${user.name || "User"},</p>
-
-      <p>We received a request to reset your password.</p>
-
-      <p>Please use the OTP below to continue:</p>
-
-      <div style="margin: 20px 0; text-align: center;">
-        <span style="
-          display: inline-block;
-          font-size: 28px;
-          font-weight: bold;
-          letter-spacing: 6px;
-          padding: 14px 24px;
-          background: #f5f5f5;
-          border-radius: 8px;
-          color: #e53935;
-        ">
-          ${otp}
-        </span>
-      </div>
-
-      <p>This OTP is valid for <strong>5 minutes</strong>.</p>
-
-      <p>If you did not request a password reset, please ignore this email. Your account remains secure.</p>
-
-      <br />
-
-      <p>Regards,<br /><strong>Your Makachi Connect App</strong></p>
-    </div>
-  `;
-  await sendEmail(user.email!, "Forgot Password OTP Code", emailTemplate);
-
-  return { email, token };
-};
-
-const resetPassword = async (
-  token: string,
-  payload: { newPassword: string; confirmPassword: string },
-) => {
-  let decode;
-  try {
-    decode = jwt.verify(
-      token,
-      config.jwt.access_secret as string,
-    ) as JwtPayload;
-  } catch (err) {
-    throw new AppError(
-      httpStatus.UNAUTHORIZED,
-      "Session has expired. Please try again",
-    );
-  }
-
+// ------------------------------------------------------------------- Login
+const loginWithCredentials = async (payload: TLoginInput) => {
   const user = await prisma.user.findUnique({
-    where: { id: decode?.userId },
-    select: {
-      auth: true,
-    },
+    where: { email: payload.email },
   });
-
-  if (!user || !user?.auth) {
-    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "AUTH_INVALID_CREDENTIALS");
   }
 
-  const passwordMatched = await bcrypt.compare(
-    payload?.newPassword,
-    user?.auth?.password as string,
+  if (user.status === "Banned") {
+    throw new AppError(httpStatus.FORBIDDEN, "AUTH_ACCOUNT_BANNED");
+  }
+  if (user.status === "Suspended") {
+    throw new AppError(httpStatus.FORBIDDEN, "AUTH_ACCOUNT_SUSPENDED");
+  }
+
+  const passwordMatches = await bcrypt.compare(
+    payload.password,
+    user.passwordHash,
+  );
+  if (!passwordMatches) {
+    throw new AppError(httpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS");
+  }
+
+  await otpService.sendOtp(user.email);
+  const pendingToken = authUtils.signPendingToken({ email: user.email });
+
+  return { pendingToken, stayLoggedIn: !!payload.stayLoggedIn };
+};
+
+// -------------------------------------------------------- Verify Login OTP
+const verifyLoginOtp = async (
+  pendingToken: string,
+  otp: string,
+  stayLoggedIn: boolean,
+  deviceMeta: TDeviceMeta,
+) => {
+  const { email } = authUtils.verifyPendingToken(pendingToken);
+  await otpService.verifyOtp(email, otp);
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+  return issueTokenPair(user.id, user.role, stayLoggedIn, deviceMeta);
+};
+
+// --------------------------------------------------------- Token issuance
+const issueTokenPair = async (
+  userId: string,
+  role: string,
+  stayLoggedIn: boolean,
+  deviceMeta: TDeviceMeta,
+) => {
+  const accessToken = authUtils.signAccessToken({ userId, role });
+  const refreshToken = authUtils.signRefreshToken(
+    { userId, role },
+    stayLoggedIn,
   );
 
-  if (passwordMatched) {
-    throw new AppError(
-      httpStatus.BAD_REQUEST,
-      "The password already exists in your account",
-    );
-  }
-
-  if (payload?.newPassword !== payload?.confirmPassword) {
-    throw new AppError(
-      httpStatus.BAD_REQUEST,
-      "New password and confirm password do not match",
-    );
-  }
-
-  if (new Date() > user?.auth?.expiredAt) {
-    throw new AppError(httpStatus.FORBIDDEN, "Session has expired");
-  }
-  if (!user?.auth?.otp_status) {
-    throw new AppError(httpStatus.FORBIDDEN, "OTP is not verified yet");
-  }
-
-  const hashedPassword = await bcrypt.hash(
-    payload?.newPassword,
-    Number(config.jwt.bcrypt_slot_rounds!),
-  );
-
-  const result = await prisma.user.update({
-    where: { id: decode?.userId },
+  // one row per device/login — this IS the "active sessions" list (see getActiveSessions below)
+  await prisma.refreshToken.create({
     data: {
-      auth: {
-        update: {
-          password: hashedPassword,
-          otp: "0",
-          otp_status: true,
-        },
-      },
+      userId,
+      token: refreshToken,
+      expiresAt: new Date(
+        Date.now() + (stayLoggedIn ? 30 : 1) * 24 * 60 * 60 * 1000,
+      ),
+      ipAddress: deviceMeta.ipAddress,
+      userAgent: deviceMeta.userAgent,
+      deviceName: deviceMeta.deviceName,
+      deviceType: deviceMeta.deviceType,
     },
   });
 
-  return result;
-};
-
-const refreshToken = async (token: string) => {
-  // Checking if the given token is valid
-  const decoded = verifyToken(token, config.jwt.refresh_secret as string);
-  const { userId } = decoded;
-  const user = await prisma.user.findFirst({
+  // bump user.lastActiveAt + lastLoginIp snapshot on the User row itself,
+  // useful for admin panel "last seen from" without joining refresh_tokens
+  await prisma.user.update({
     where: { id: userId },
-    include: { auth: true },
+    data: { lastActiveAt: new Date() },
   });
 
-  if (!user || !user?.auth) {
-    throw new AppError(httpStatus.NOT_FOUND, "User not found");
-  }
-  const isDeleted = user?.auth?.isDeleted;
-
-  if (isDeleted) {
-    throw new AppError(httpStatus.FORBIDDEN, "This user is deleted");
-  }
-
-  const jwtPayload = {
-    userId: user?.id,
-    role: user.auth?.role,
-    email: user.email,
-  };
-
-  const accessToken = createToken(
-    jwtPayload,
-    config.jwt.access_secret as string,
-    60 * 60 * 24 * 7, //7 days
-  );
-
-  const refreshToken = createToken(
-    jwtPayload,
-    config.jwt.refresh_secret as string,
-    60 * 60 * 24 * 30, //30 days
-  );
-
-  return {
-    accessToken,
-    refreshToken,
-  };
+  return { accessToken, refreshToken };
 };
 
-const socialLogin = async (data: SocialLoginPayload) => {
-  const { provider, providerId, email, name, profileImg } = data;
+// ------------------------------------------------------------------ Refresh
+const refreshAccessToken = async (token: string, deviceMeta: TDeviceMeta) => {
+  const stored = await prisma.refreshToken.findUnique({ where: { token } });
+  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    throw new AppError(httpStatus.UNAUTHORIZED, "Invalid refresh token");
+  }
 
-  // ─── 1. Find existing user by email ──────────────────────────────────────
-  let user = await prisma.user.findUnique({
-    where: { email },
+  const decoded = authUtils.verifyRefreshToken(token);
+
+  // rotate: revoke old row, issue a new one carrying the same device identity forward
+  // (IP can shift slightly on mobile networks — we just re-capture the latest one)
+  await prisma.refreshToken.update({
+    where: { token },
+    data: { revokedAt: new Date() },
+  });
+
+  return issueTokenPair(decoded.userId, decoded.role, true, deviceMeta);
+};
+
+// ------------------------------------------------------- Active sessions list
+// GET /api/auth/sessions — "which devices am I logged in on"
+const getActiveSessions = async (userId: string) => {
+  return prisma.refreshToken.findMany({
+    where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
     select: {
       id: true,
-      email: true,
-      name: true,
-      isDeleted: true,
-      isGuest: true,
-      auth: {
-        select: {
-          id: true,
-          role: true,
-          isActive: true,
-          isDeleted: true,
-          isVerified: true,
-        },
-      },
-      picture: {
-        select: { url: true },
-      },
+      ipAddress: true,
+      deviceName: true,
+      deviceType: true,
+      createdAt: true,
+      lastUsedAt: true,
     },
+    orderBy: { lastUsedAt: "desc" },
   });
-
-  // ─── 2. If user exists but is deleted/banned ──────────────────────────────
-  if (user?.isDeleted || user?.auth?.isDeleted) {
-    throw new Error(
-      "Your account has been deactivated. Please contact support.",
-    );
-  }
-
-  if (user?.auth && !user.auth.isActive) {
-    throw new Error("Your account is suspended. Please contact support.");
-  }
-
-  // ─── 3. Create new user if not found ─────────────────────────────────────
-  if (!user) {
-    user = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          email,
-          name,
-          socialLogin: true,
-          auth: {
-            create: {
-              email,
-              password: `${provider}_${providerId}_social`, // non-usable password
-              role: Role.User,
-              isVerified: true, // social = pre-verified
-              isActive: true,
-            },
-          },
-          ...(profileImg && {
-            picture: {
-              create: {
-                url: profileImg,
-                key: `social_${provider}_${providerId}`,
-              },
-            },
-          }),
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          isDeleted: true,
-          isGuest: true,
-          auth: {
-            select: {
-              id: true,
-              role: true,
-              isActive: true,
-              isDeleted: true,
-              isVerified: true,
-            },
-          },
-          picture: {
-            select: { url: true },
-          },
-        },
-      });
-
-      return newUser;
-    });
-  } else {
-    // ─── 4. Existing user — update profile pic if missing & mark socialLogin ─
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: user!.id },
-        data: { socialLogin: true },
-      });
-
-      if (profileImg && !user!.picture) {
-        await tx.profilePicture.create({
-          data: {
-            url: profileImg,
-            key: `social_${provider}_${providerId}`,
-            userId: user!.id,
-          },
-        });
-      }
-
-      // Update last_login
-      await tx.auth.update({
-        where: { userId: user!.id },
-        data: { last_login: new Date() },
-      });
-    });
-  }
-
-  // ─── 5. Generate tokens ───────────────────────────────────────────────────
-  const jwtPayload = {
-    userId: user.id,
-    role: user.auth!.role,
-    email: user.email,
-  };
-
-  const accessToken = createToken(
-    jwtPayload,
-    config.jwt.access_secret as string,
-    60 * 60 * 24 * 7, //7 days
-  );
-
-  const refreshToken = createToken(
-    jwtPayload,
-    config.jwt.refresh_secret as string,
-    60 * 60 * 24 * 30, // 30 days
-  );
-
-  return {
-    accessToken,
-    refreshToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.auth!.role,
-      isVerified: user.auth!.isVerified,
-      profileImg: user.picture?.url ?? profileImg ?? null,
-    },
-  };
 };
 
-const switchAccount = async (userId: string, targetRole: Role) => {
-  const auth = await prisma.auth.findUnique({
-    where: { userId },
-  });
-  // console.log("auth__", auth);
-
-  if (!auth) {
-    throw new AppError(httpStatus.NOT_FOUND, "Auth not found");
-  }
-
-  // এই user এর ঐ role exist or not exist check
-  if (!auth.roles.includes(targetRole)) {
-    throw new AppError(
-      httpStatus.FORBIDDEN,
-      "You do not have access to this account type",
-    );
-  }
-
-  // active role update
-  await prisma.auth.update({
-    where: { userId },
-    data: { role: targetRole },
+// DELETE /api/auth/sessions/:id — force-logout one specific device
+const revokeSession = async (userId: string, sessionId: string) => {
+  const session = await prisma.refreshToken.findUniqueOrThrow({
+    where: { id: sessionId },
   });
 
-  // new token issue
-  const jwtPayload = { userId, role: targetRole, email: auth.email };
+  if (session.userId !== userId) {
+    throw new AppError(httpStatus.FORBIDDEN, "Not your session");
+  }
 
-  const accessToken = createToken(
-    jwtPayload,
-    config.jwt.access_secret as string,
-    60 * 60 * 24 * 7,
-  );
-
-  const refreshToken = createToken(
-    jwtPayload,
-    config.jwt.refresh_secret as string,
-    60 * 60 * 24 * 30,
-  );
-
-  return {
-    activeRole: targetRole,
-    accessToken,
-    refreshToken,
-  };
+  await prisma.refreshToken.update({
+    where: { id: sessionId },
+    data: { revokedAt: new Date() },
+  });
 };
 
-// Vendor upgrade request (User → Vendor upgrade)
-const upgradeToVendor = async (userId: string) => {
-  const auth = await prisma.auth.findUnique({
-    where: { userId },
+// -------------------------------------------------------------------- Logout
+const logout = async (token: string) => {
+  await prisma.refreshToken.updateMany({
+    where: { token },
+    data: { revokedAt: new Date() },
   });
+};
 
-  if (!auth) {
-    throw new AppError(httpStatus.NOT_FOUND, "Auth not found");
-  }
+// ---------------------------------------------------------- Forgot / Reset
+const forgotPassword = async (email: string) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return; // don't leak account existence
 
-  if (auth.roles.includes(Role.Vendor)) {
+  const token = uuidv4();
+  await redis.set(
+    resetTokenKey(token),
+    user.id,
+    "EX",
+    config.redis.reset_token_ttl_seconds,
+  );
+  await sendResetPasswordEmail(email, token);
+};
+
+const resetPassword = async (token: string, newPassword: string) => {
+  const userId = await redis.get(resetTokenKey(token));
+  if (!userId) {
     throw new AppError(
       httpStatus.BAD_REQUEST,
-      "You are Already a vendor, no need to upgrade.",
+      "Reset token invalid or expired",
     );
   }
 
-  await prisma.auth.update({
-    where: { userId },
-    data: {
-      roles: { push: Role.Vendor },
-    },
-  });
+  const passwordHash = await bcrypt.hash(
+    newPassword,
+    config.jwt.bcrypt_salt_rounds,
+  );
 
-  return { message: "Vendor access granted" };
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+    // invalidate all sessions on password change
+    prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
+
+  await redis.del(resetTokenKey(token));
 };
 
 export const authService = {
-  createAccountIntoDB,
-  accountLoginFromDB,
-  changePasswordFromDB,
+  registerIntoDB,
+  verifyRegisterOtp,
+  loginWithCredentials,
+  verifyLoginOtp,
+  refreshAccessToken,
+  logout,
   forgotPassword,
   resetPassword,
-  refreshToken,
-  socialLogin,
-
-  switchAccount,
-  upgradeToVendor,
+  getActiveSessions,
+  revokeSession,
 };
