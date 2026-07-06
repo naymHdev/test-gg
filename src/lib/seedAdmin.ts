@@ -1,64 +1,59 @@
 import bcrypt from "bcrypt";
-import config from "../app/config";
 import { prisma } from "../shared/prisma";
-import { Role } from "../../generated/prisma/client";
+import {
+  Role,
+  AccountStatus,
+  Region,
+  Language,
+} from "../../generated/prisma/client";
+import config from "../app/config";
 
 const seedAdmin = async (): Promise<void> => {
   try {
     const email = config.admin.admin_email!;
-    const phone = config.admin.phone_number!;
+    const password = config.admin.admin_password!;
+    const username = config.admin.admin_username ?? "admin";
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    const existingAdmin = await prisma.user.findUnique({
+      where: {
+        email,
+      },
     });
 
-    if (existingUser) {
-      console.log("Admin account already exists ✅");
+    if (existingAdmin) {
+      console.log("✅ Admin account already exists");
       return;
     }
 
-    const hashedPassword = await bcrypt.hash(config.admin.admin_password!, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          name: "Miss Chine",
-          email,
-          phone,
-          gender: "OTHER",
-          notification: true,
-          isOnline: false,
-          socialLogin: false,
-          isGuest: false,
-          isDeleted: false,
-          locationType: "Point",
-          latitude: 0,
-          longitude: 0,
-        },
-      });
+    await prisma.user.create({
+      data: {
+        username,
+        email,
+        passwordHash,
 
-      await tx.auth.create({
-        data: {
-          email,
-          password: hashedPassword,
-          role: Role.SUPER_ADMIN,
-          roles: [Role.SUPER_ADMIN],
-          isActive: true,
-          isDeleted: false,
-          isVerified: true,
-          otp: "0",
-          otp_status: true,
-          expiredAt: new Date(),
-          last_login: new Date(),
-          passwordChangedAt: new Date(),
-          userId: user.id,
+        role: Role.Admin,
+        status: AccountStatus.Active,
+
+        region: Region.NA, // Change your default region
+        accountLanguage: Language.en,
+        uiLanguage: Language.en,
+
+        agreedToTerms: true,
+        agreedToPrivacy: true,
+
+        profile: {
+          create: {
+            bio: "System Administrator",
+          },
         },
-      });
+      },
     });
 
-    console.log("Admin account created ✅");
-  } catch (err: any) {
-    console.error("Error creating admin account:", err.message);
+    console.log("✅ Admin account created successfully");
+  } catch (error) {
+    console.error("❌ Failed to seed admin:", error);
   } finally {
     await prisma.$disconnect();
   }

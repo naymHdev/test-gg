@@ -2,6 +2,13 @@ import dotenv from "dotenv";
 import path from "path";
 dotenv.config({ path: path.join(process.cwd(), ".env") });
 
+const admin = {
+  admin_email: process.env.ADMIN_EMAIL,
+  phone_number: process.env.PHONE_NUMBER,
+  admin_password: process.env.ADMIN_PASSWORD,
+  admin_username: process.env.ADMIN_USER_NAME,
+};
+
 const jwt = {
   access_secret: process.env.JWT_ACCESS_SECRET,
   refresh_secret: process.env.JWT_REFRESH_SECRET,
@@ -63,6 +70,7 @@ export default {
   client_url: process.env.CLIENT_URL, // web app origin
   dashboard_url: process.env.DASHBOARD_URL, // owner/admin panel origin
 
+  admin,
   jwt,
   redis,
   aws,
