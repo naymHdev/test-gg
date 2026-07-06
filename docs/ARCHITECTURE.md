@@ -1,4 +1,4 @@
-# FinderQ Backend — Architecture & API Design
+# FinderQ Backend — Architecture & API Design || awa-test repo dekho
 Built on the exact layered pattern used in `awa-test` (adaora-server): Express + Prisma + Zod, module-per-feature, `catchAsync` / `sendResponse` / `AppError` / `QueryBuilder` / role-based `auth()` middleware.
 
 ---

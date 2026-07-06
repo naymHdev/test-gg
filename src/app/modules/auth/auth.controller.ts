@@ -16,7 +16,6 @@ const register = catchAsync(async (req, res) => {
 });
 
 const verifyOtp = catchAsync(async (req, res) => {
-  // purpose distinguishes register-flow vs login-flow OTP verification
   const { pendingToken, otp, purpose, stayLoggedIn } = req.body;
   const deviceMeta = extractDeviceMeta(req);
 
@@ -35,7 +34,10 @@ const verifyOtp = catchAsync(async (req, res) => {
     statusCode: httpStatus.OK,
     success: true,
     message: "Verified successfully",
-    data: { accessToken: result.accessToken },
+    data: {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    },
   });
 });
 

@@ -72,6 +72,7 @@ const loginValidation = z.object({
 const verifyOtpValidation = z.object({
   pendingToken: z.string({ message: "pendingToken is required" }),
   otp: z.string().length(6, "OTP must be 6 digits"),
+  purpose: z.string().optional(),
 });
 
 const forgotPasswordValidation = z.object({

@@ -10,11 +10,13 @@ const verifyPendingToken = (token: string) =>
 
 const signAccessToken = (payload: TJwtPayload) =>
   jwt.sign(payload, config.jwt.access_secret as string, {
+    // @ts-ignore
     expiresIn: config.jwt.access_expires_in,
   });
 
 const signRefreshToken = (payload: TJwtPayload, stayLoggedIn: boolean) =>
   jwt.sign(payload, config.jwt.refresh_secret as string, {
+    // @ts-ignore
     expiresIn: stayLoggedIn
       ? config.jwt.refresh_expires_in_extended
       : config.jwt.refresh_expires_in_default,

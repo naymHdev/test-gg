@@ -8,7 +8,7 @@ import config from "../config";
 const transporter = nodemailer.createTransport({
   host: config.nodemailer.host,
   port: Number(config.nodemailer.port),
-  secure: Boolean(config.nodemailer.secure), // true for port 465, false for 587/STARTTLS
+  secure: Boolean(config.nodemailer.secure),
   auth: {
     user: config.nodemailer.auth.user,
     pass: config.nodemailer.auth.pass,
@@ -23,8 +23,7 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
       subject,
       html,
     });
-
-    console.log(`Email sent: ${info.messageId}`);
+    console.log(`Email sent: ${info?.envelope?.to?.[0]}`);
     return info;
   } catch (error) {
     // AppError thrown intentionally elsewhere shouldn't be swallowed/re-wrapped
