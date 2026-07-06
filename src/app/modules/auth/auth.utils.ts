@@ -25,10 +25,14 @@ const signRefreshToken = (payload: TJwtPayload, stayLoggedIn: boolean) =>
 const verifyRefreshToken = (token: string) =>
   jwt.verify(token, config.jwt.refresh_secret as string) as TJwtPayload;
 
+const verifyAccessToken = (token: string) =>
+  jwt.verify(token, config.jwt.access_secret as string) as TJwtPayload;
+
 export const authUtils = {
   signPendingToken,
   verifyPendingToken,
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
+  verifyAccessToken,
 };
