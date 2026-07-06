@@ -1,5 +1,5 @@
 model SupportConversation {
-  id         String                    @id @default(uuid())
+  id         String                    @id @default(cuid())
   userId     String
   user       User                      @relation("SupportUser", fields: [userId], references: [id], onDelete: Cascade)
 
@@ -17,7 +17,7 @@ model SupportConversation {
 }
 
 model SupportMessage {
-  id             String              @id @default(uuid())
+  id             String              @id @default(cuid())
   conversationId String
   conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 

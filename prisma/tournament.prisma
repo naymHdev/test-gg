@@ -1,5 +1,5 @@
 model Tournament {
-  id        String @id @default(uuid())
+  id        String @id @default(cuid())
   creatorId String
   creator   User   @relation("TournamentCreator", fields: [creatorId], references: [id])
 
@@ -27,7 +27,7 @@ model Tournament {
 }
 
 model Team {
-  id           String     @id @default(uuid())
+  id           String     @id @default(cuid())
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
@@ -63,7 +63,7 @@ model TeamMember {
 }
 
 model Match {
-  id           String     @id @default(uuid())
+  id           String     @id @default(cuid())
   tournamentId String
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 

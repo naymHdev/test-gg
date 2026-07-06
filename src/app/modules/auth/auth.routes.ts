@@ -2,9 +2,9 @@ import { Router } from "express";
 import { authController } from "./auth.controller";
 import { authValidation } from "./auth.validation";
 import validateRequest from "../../middleware/validateRequest";
-import auth from "../../middleware/auth";
 import { rateLimiter } from "../../middleware/rateLimiter";
-import { Role } from "../../../../generated/prisma/enums";
+import { Permission, Role } from "../../../../generated/prisma/enums";
+import authorize from "../../middleware/auth";
 
 const router = Router();
 
@@ -45,12 +45,12 @@ router.put(
 // "which devices am I logged in on" + force-logout a specific one
 router.get(
   "/sessions",
-  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  authorize(Permission.ban_users),
   authController.getSessions,
 );
 router.delete(
   "/sessions/:id",
-  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  authorize(Permission.ban_users),
   authController.revokeSession,
 );
 

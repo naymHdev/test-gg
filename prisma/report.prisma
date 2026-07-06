@@ -1,5 +1,5 @@
 model Report {
-  id             String           @id @default(uuid())
+  id             String           @id @default(cuid())
 
   reporterId     String
   reporter       User             @relation("Reporter", fields: [reporterId], references: [id])

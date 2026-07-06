@@ -1,5 +1,5 @@
 model Notification {
-  id        String           @id @default(uuid())
+  id        String           @id @default(cuid())
   userId    String
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -18,7 +18,7 @@ model Notification {
 // Versioned legal docs — accepted-version snapshot stored on registration via
 // agreedToTerms/agreedToPrivacy booleans on User; this table stores the actual content
 model LegalDocument {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   type      String   @db.VarChar(50)   // 'privacy_policy' | 'terms'
   version   String   @db.VarChar(20)
   content   String

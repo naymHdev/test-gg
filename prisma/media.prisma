@@ -1,5 +1,5 @@
 model MediaPost {
-  id          String         @id @default(uuid())
+  id          String         @id @default(cuid())
   userId      String
   user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -26,7 +26,7 @@ model MediaPost {
 }
 
 model MediaComment {
-  id          String    @id @default(uuid())
+  id          String    @id @default(cuid())
   mediaPostId String
   mediaPost   MediaPost @relation(fields: [mediaPostId], references: [id], onDelete: Cascade)
 

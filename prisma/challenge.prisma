@@ -1,5 +1,5 @@
 model Challenge {
-  id          String              @id @default(uuid())
+  id          String              @id @default(cuid())
   title       String              @db.VarChar(200)
   description String?
   difficulty  ChallengeDifficulty
@@ -21,7 +21,7 @@ model Challenge {
 }
 
 model ChallengeEnrollment {
-  id          String    @id @default(uuid())
+  id          String    @id @default(cuid())
   challengeId String
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
 
@@ -39,7 +39,7 @@ model ChallengeEnrollment {
 }
 
 model Reward {
-  id          String  @id @default(uuid())
+  id          String  @id @default(cuid())
   title       String  @db.VarChar(200)
   description String?
   icon        String? @db.VarChar(10)
@@ -57,7 +57,7 @@ model Reward {
 }
 
 model RewardPurchase {
-  id       String @id @default(uuid())
+  id       String @id @default(cuid())
   rewardId String
   reward   Reward @relation(fields: [rewardId], references: [id])
 
