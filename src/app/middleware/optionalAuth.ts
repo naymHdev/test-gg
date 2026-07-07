@@ -13,9 +13,9 @@ const optionalAuth = catchAsync(async (req, res, next) => {
     return next();
   }
 
-  let decode: JwtPayload;
+  let decoded: JwtPayload;
   try {
-    decode = jwt.verify(
+    decoded = jwt.verify(
       token,
       config.jwt.access_secret as string,
     ) as JwtPayload;
@@ -25,24 +25,29 @@ const optionalAuth = catchAsync(async (req, res, next) => {
     return next();
   }
 
-  const { role, userId, email } = decode;
-  const existAccount = await prisma.user.findFirst({
-    where: { id: userId, isGuest: false },
-    include: { auth: true },
+  const user = await prisma.user.findUnique({
+    where: { id: decoded.userId },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+      username: true,
+      email: true,
+    },
   });
 
-  if (
-    !existAccount ||
-    !existAccount?.auth?.isVerified ||
-    existAccount?.auth?.isDeleted ||
-    !existAccount?.auth?.isActive
-  ) {
+  if (!user || user.status === "Banned" || user.status === "Suspended") {
     // @ts-ignore
     req.user = null;
     return next();
   }
 
-  req.user = { id: userId, role, email };
+  req.user = {
+    id: user.id,
+    role: user.role,
+    username: user.username,
+    email: user.email,
+  };
   next();
 });
 
