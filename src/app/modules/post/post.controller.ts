@@ -3,11 +3,29 @@ import catchAsync from "../../utils/catchAsync";
 import sendResponse from "../../utils/sendResponse";
 import { postService } from "./post.service";
 import { Permission } from "../../../../generated/prisma/enums";
+import { uploadManyToS3 } from "../../utils/s3";
 
 const createPost = catchAsync(async (req, res) => {
-  // @ts-ignore
   const userId = req.user.id;
-  const result = await postService.createPostIntoDB(userId, req.body);
+  const body = req.body;
+  const files = req.files as {
+    images?: Express.Multer.File[];
+  };
+
+  const imageFiles = files?.images ?? [];
+  let uploadedImages: string[] = [];
+  if (imageFiles.length > 0) {
+    const formattedFiles = imageFiles.map((file) => ({
+      file,
+      path: "posts",
+    }));
+
+    const uploadResults = await uploadManyToS3(formattedFiles);
+    uploadedImages = uploadResults.map((item) => item.url);
+  }
+
+  body.images = uploadedImages;
+  const result = await postService.createPostIntoDB(userId, body);
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
@@ -28,9 +46,40 @@ const getPosts = catchAsync(async (req, res) => {
 });
 
 const updatePost = catchAsync(async (req, res) => {
-  // @ts-ignore
   const userId = req.user.id;
-  const result = await postService.updatePostInDB(req.params.id, userId, req.body);
+  const body = req.body;
+
+  const files = req.files as {
+    images?: Express.Multer.File[];
+  };
+  const imageFiles = files?.images ?? [];
+
+  let uploadedImages: string[] = [];
+  if (imageFiles.length > 0) {
+    const formattedFiles = imageFiles.map((file) => ({
+      file,
+      path: "posts",
+    }));
+    const uploadResults = await uploadManyToS3(formattedFiles);
+    uploadedImages = uploadResults.map((item) => item.url);
+  }
+
+  let keepImages: string[] = [];
+  if (body.keepImages) {
+    keepImages =
+      typeof body.keepImages === "string"
+        ? JSON.parse(body.keepImages)
+        : body.keepImages;
+  }
+
+  body.images = [...keepImages, ...uploadedImages];
+  delete body.keepImages;
+  const result = await postService.updatePostInDB(
+    req.params.id as string,
+    userId,
+    body,
+  );
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -46,7 +95,7 @@ const deletePost = catchAsync(async (req, res) => {
     role === "Owner" || permissions.includes(Permission.delete_content);
 
   const result = await postService.deletePostFromDB(
-    req.params.id,
+    req.params.id as string,
     { id: userId, role },
     hasDeletePermission,
   );

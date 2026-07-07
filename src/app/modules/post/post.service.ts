@@ -2,36 +2,48 @@ import httpStatus from "http-status";
 import AppError from "../../error/AppError";
 import { prisma } from "../../../shared/prisma";
 import QueryBuilder from "../../builder/QueryBuilder";
+import { CreatePostInput, UpdatePostPayload } from "./post.validation";
 
-const createPostIntoDB = async (userId: string, payload: any) => {
+const createPostIntoDB = async (userId: string, payload: CreatePostInput) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
-  // language snapshot is taken from the author's account language, never from
-  // client input (SRS §5.1 — language column is immutable per post)
+  const { images = [], ...postData } = payload;
+
   return prisma.post.create({
     data: {
-      ...payload,
+      ...postData,
       userId,
       language: user.accountLanguage,
       isVerified: user.isRiotVerified,
       isPremium: user.isPremium,
+
+      images: {
+        create: images.map((url: string, index: number) => ({
+          url,
+          order: index,
+        })),
+      },
+    },
+    include: {
+      images: true,
     },
   });
 };
 
-// GET /api/posts?region=euw&language=ro&types[]=Clash&ranks[]=Gold&page=1&limit=20
 const getPostsFromDB = async (query: Record<string, unknown>) => {
   const queryBuilder = new QueryBuilder(query)
-    .search(["content"])
+    .search(["content", "region"])
     .filter()
     .sort()
     .paginate();
 
-  // Premium posts surface first within the same page (SRS §13.5 "priority in search")
   const options = queryBuilder.build();
-  options.orderBy = [{ isPremium: "desc" }, ...(
-    Array.isArray(options.orderBy) ? options.orderBy : [options.orderBy || { createdAt: "desc" }]
-  )];
+  options.orderBy = [
+    { isPremium: "desc" },
+    ...(Array.isArray(options.orderBy)
+      ? options.orderBy
+      : [options.orderBy || { createdAt: "desc" }]),
+  ];
   options.where.deletedAt = null;
 
   const posts = await prisma.post.findMany({
@@ -43,6 +55,7 @@ const getPostsFromDB = async (query: Record<string, unknown>) => {
           profile: { select: { avatarUrl: true, rank: true } },
         },
       },
+      images: true,
     },
   });
 
@@ -50,14 +63,63 @@ const getPostsFromDB = async (query: Record<string, unknown>) => {
   return { posts, meta };
 };
 
-const updatePostInDB = async (postId: string, userId: string, payload: any) => {
-  const post = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+const updatePostInDB = async (
+  postId: string,
+  userId: string,
+  payload: Partial<UpdatePostPayload>,
+) => {
+  const post = await prisma.post.findUniqueOrThrow({
+    where: {
+      id: postId,
+    },
+    include: {
+      images: true,
+    },
+  });
 
   if (post.userId !== userId) {
     throw new AppError(httpStatus.FORBIDDEN, "You can only edit your own post");
   }
 
-  return prisma.post.update({ where: { id: postId }, data: payload });
+  const { images = [], ...postData } = payload;
+
+  return prisma.$transaction(async (tx) => {
+    await tx.post.update({
+      where: {
+        id: postId,
+      },
+      data: postData,
+    });
+
+    await tx.postImage.deleteMany({
+      where: {
+        postId,
+      },
+    });
+
+    if (images.length > 0) {
+      await tx.postImage.createMany({
+        data: images.map((url: string, index: number) => ({
+          postId,
+          url,
+          order: index,
+        })),
+      });
+    }
+
+    return tx.post.findUniqueOrThrow({
+      where: {
+        id: postId,
+      },
+      include: {
+        images: {
+          orderBy: {
+            order: "asc",
+          },
+        },
+      },
+    });
+  });
 };
 
 const deletePostFromDB = async (

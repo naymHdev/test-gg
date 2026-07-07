@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PostType, Region } from "../../../../generated/prisma/client";
 
 const tagSchema = z.object({
   text: z.string(),
@@ -6,24 +7,34 @@ const tagSchema = z.object({
   color: z.string().optional(),
 });
 
-const createPostValidation = z.object({
-  region: z.string({ message: "Region is required" }),
+export const createPostValidation = z.object({
+  region: z.nativeEnum(Region, {
+    message: "Region is required",
+  }),
   content: z.string().min(1).max(500),
-  imageUrl: z.string().url().optional(),
+
   tags: z.array(tagSchema).max(6).optional(),
-  types: z.array(z.string()).optional(),
+  types: z.array(z.nativeEnum(PostType)).optional(),
   ranks: z.array(z.string()).optional(),
   roles: z.array(z.string()).optional(),
 });
 
-// region is immutable after creation — deliberately omitted here
-const updatePostValidation = z.object({
+export const updatePostValidation = z.object({
   content: z.string().min(1).max(500).optional(),
-  imageUrl: z.string().url().optional(),
+
   tags: z.array(tagSchema).max(6).optional(),
-  types: z.array(z.string()).optional(),
+  types: z.array(z.nativeEnum(PostType)).optional(),
   ranks: z.array(z.string()).optional(),
   roles: z.array(z.string()).optional(),
 });
 
-export const postValidation = { createPostValidation, updatePostValidation };
+export type CreatePostPayload = z.infer<typeof createPostValidation>;
+
+export type CreatePostInput = CreatePostPayload & {
+  images: string[];
+};
+
+export type UpdatePostInput = z.infer<typeof updatePostValidation>;
+export type UpdatePostPayload = UpdatePostInput & {
+  images: string[];
+};

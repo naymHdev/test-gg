@@ -1,24 +1,26 @@
 import rateLimit from "express-rate-limit";
 
-/**
- * Factory — call this per-route with the limit that route needs (SRS §20 table).
- * Keeps a single source of truth for "how do we build a limiter" (message shape,
- * standardHeaders, IP resolution) without repeating rateLimit({...}) everywhere.
- */
 const createRateLimiter = (windowMs: number, limit: number, message?: string) =>
   rateLimit({
     windowMs,
     limit,
     standardHeaders: true,
     legacyHeaders: false,
-    message: {
-      success: false,
-      message: message || "Too many requests, please try again later.",
+    handler: (req, res) => {
+      res.status(429).json({
+        success: false,
+        message: message || "Too many requests, please try again later.",
+        errorSources: [
+          {
+            path: "",
+            message: message || "Rate limit exceeded. Please try again later.",
+          },
+        ],
+        stack: null,
+      });
     },
   });
 
-// Named presets matching the SRS §20 rate-limit table exactly — import the one
-// you need instead of writing rateLimit({...}) inline in every routes.ts file.
 export const rateLimiter = {
   login: createRateLimiter(
     60 * 1000,
@@ -50,8 +52,6 @@ export const rateLimiter = {
     10,
     "Upload limit reached, try again later.",
   ),
-
-  // baseline, applied globally in app.ts — generous, just to blunt abuse/bots
   global: createRateLimiter(60 * 1000, 100),
 };
 

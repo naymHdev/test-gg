@@ -1,29 +1,44 @@
 model Post {
-  id             String    @id @default(cuid())
-  userId         String
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  region         Region
-  content        String    @db.VarChar(500)
-  imageUrl       String?
-  language       Language                     // snapshot of user.accountLanguage, immutable
+  region   Region
+  content  String   @db.VarChar(500)
+  language Language
 
-  tags           Json?                        // [{ text, bg, color }]
-  types          PostType[]
-  ranks          String[]
-  roles          String[]
+  tags  Json?
+  types PostType[]
+  ranks String[]
+  roles String[]
 
-  isVerified     Boolean   @default(false)     // snapshot of user.isRiotVerified at post time
-  isPremium      Boolean   @default(false)      // snapshot of user.isPremium at post time
-  trophyEarnings Decimal   @default(0) @db.Decimal(10, 2)
+  isVerified     Boolean @default(false)
+  isPremium      Boolean @default(false)
+  trophyEarnings Decimal @default(0) @db.Decimal(10, 2)
 
-  reports        Report[]
+  images  PostImage[]
+  reports Report[]
 
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([region, language, deletedAt])
   @@index([createdAt])
   @@map("posts")
+}
+
+model PostImage {
+  id String @id @default(cuid())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  url   String
+  order Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+  @@map("post_images")
 }
