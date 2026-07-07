@@ -11,6 +11,7 @@ const getUserProfileFromDB = async (username: string) => {
       wallet: true,
       userPoints: true,
       subscription: true,
+      permissions: true,
     },
   });
 

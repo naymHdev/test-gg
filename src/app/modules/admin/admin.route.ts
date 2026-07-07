@@ -11,4 +11,16 @@ router.get(
   adminController.getAllUsers,
 );
 
+router.patch(
+  "/users/:id/role",
+  auth(Role.Admin, Role.Owner),
+  adminController.updateRole,
+);
+
+router.patch(
+  "/users/:id/permissions",
+  auth(Role.Admin, Role.Owner),
+  adminController.upsertPermissions,
+);
+
 export const adminRoutes = router;
