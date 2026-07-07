@@ -1,4 +1,5 @@
 import { prisma } from "../../../shared/prisma";
+import { redis } from "../../../shared/redis";
 
 const getUserProfileFromDB = async (username: string) => {
   const result = await prisma.user.findUnique({
@@ -48,9 +49,23 @@ const updateProfileBanner = async (payload: {
   return result;
 };
 
+const getPresenceBatch = async (userIds: string[]) => {
+  const keys = userIds.map((id) => `presence:${id}`);
+  const values = await redis.mget(...keys); // 👈 batch read, একবারেই সব key
+
+  return userIds.reduce(
+    (acc, id, i) => {
+      acc[id] = values[i] === "online";
+      return acc;
+    },
+    {} as Record<string, boolean>,
+  );
+};
+
 export const UserService = {
   getUserProfileFromDB,
   updateProfile,
   updateProfileAvatar,
   updateProfileBanner,
+  getPresenceBatch,
 };

@@ -115,30 +115,68 @@ export const paginate = async <T extends Record<string, unknown>>({
 // ─── Where Condition Builder ──────────────────────────────────────────────────
 
 type SearchField = { field: string; mode?: Prisma.QueryMode };
+type FilterConfig = {
+  query: string;
+  field?: string;
+  operator?:
+    | "equals"
+    | "contains"
+    | "startsWith"
+    | "endsWith"
+    | "gte"
+    | "lte"
+    | "in";
+  mode?: Prisma.QueryMode;
+};
 
 export const buildWhereClause = (
   searchTerm: string | undefined,
   searchFields: SearchField[],
-  filters: Record<string, unknown> = {},
-): Record<string, unknown> => {
-  const andConditions: Record<string, unknown>[] = [];
+  query: Record<string, any>,
+  filterConfigs: FilterConfig[],
+) => {
+  const AND: any[] = [];
 
-  if (searchTerm && searchFields.length) {
-    andConditions.push({
+  if (searchTerm) {
+    AND.push({
       OR: searchFields.map(({ field, mode = "insensitive" }) => ({
-        [field]: { contains: searchTerm, mode },
+        [field]: {
+          contains: searchTerm,
+          mode,
+        },
       })),
     });
   }
 
-  const validFilters = Object.entries(filters).filter(
-    ([, v]) => v !== undefined && v !== "",
-  );
-  if (validFilters.length) {
-    andConditions.push({
-      AND: validFilters.map(([key, value]) => ({ [key]: { equals: value } })),
-    });
+  for (const config of filterConfigs) {
+    const value = query[config.query];
+
+    if (value === undefined || value === "") continue;
+
+    const field = config.field ?? config.query;
+    const operator = config.operator ?? "equals";
+
+    if (operator === "contains") {
+      AND.push({
+        [field]: {
+          contains: value,
+          mode: config.mode ?? "insensitive",
+        },
+      });
+    } else if (operator === "in") {
+      AND.push({
+        [field]: {
+          in: Array.isArray(value) ? value : value.split(","),
+        },
+      });
+    } else {
+      AND.push({
+        [field]: {
+          [operator]: value,
+        },
+      });
+    }
   }
 
-  return andConditions.length ? { AND: andConditions } : {};
+  return AND.length ? { AND } : {};
 };

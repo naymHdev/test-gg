@@ -33,4 +33,10 @@ router.patch(
   UserController.updateProfileBanner,
 );
 
+router.get(
+  "/presence",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  UserController.getPresence,
+);
+
 export const userRoutes = router;

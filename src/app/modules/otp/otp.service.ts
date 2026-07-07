@@ -17,6 +17,8 @@ const sendOtp = async (email: string) => {
     lowerCaseAlphabets: false,
   });
 
+  console.log("sendOtp::", otp);
+
   await redis.set(otpKey(email), otp, "EX", config.redis.otp_ttl_seconds);
   await redis.del(attemptsKey(email)); // fresh attempt counter per new OTP
   await sendOtpEmail(email, otp);

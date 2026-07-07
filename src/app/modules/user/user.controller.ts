@@ -82,9 +82,16 @@ const updateProfileBanner = catchAsync(async (req, res) => {
   });
 });
 
+const getPresence = catchAsync(async (req, res) => {
+  const userIds = (req.query.userIds as string)?.split(",");
+  const result = await UserService.getPresenceBatch(userIds);
+  sendResponse(res, { statusCode: 200, success: true, data: result });
+});
+
 export const UserController = {
   getUserProfile,
   updateProfile,
   updateProfileAvatar,
   updateProfileBanner,
+  getPresence,
 };
