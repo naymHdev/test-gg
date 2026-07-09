@@ -22,6 +22,7 @@ export const createMatchValidation = z
     teamBId: z.string().min(1, "teamBId is required"),
     round: z.number().int().min(1),
     matchIndex: z.number().int().min(0),
+    scheduledAt: z.coerce.date(),
   })
   .refine((data) => data.teamAId !== data.teamBId, {
     message: "A team cannot play against itself",

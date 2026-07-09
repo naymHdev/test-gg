@@ -194,7 +194,11 @@ const registerTeamIntoDB = async (
         name: payload.name,
         captainId,
         members: {
-          create: { userId: captainId, role: TeamMemberRole.Captain },
+          create: {
+            userId: captainId,
+            tournamentId,
+            role: TeamMemberRole.Captain,
+          },
         },
       },
       include: { members: true },
@@ -236,10 +240,17 @@ const createMatchIntoDB = async (
     const clashingMatch = await tx.match.findFirst({
       where: {
         tournamentId,
-        round: payload.round,
         OR: [
           { teamAId: { in: [payload.teamAId, payload.teamBId] } },
           { teamBId: { in: [payload.teamAId, payload.teamBId] } },
+        ],
+        AND: [
+          {
+            OR: [
+              { round: payload.round },
+              { scheduledAt: payload.scheduledAt },
+            ],
+          },
         ],
       },
     });
@@ -247,7 +258,9 @@ const createMatchIntoDB = async (
     if (clashingMatch) {
       throw new AppError(
         httpStatus.CONFLICT,
-        "One of these teams already has a match scheduled for this round",
+        clashingMatch.round === payload.round
+          ? "One of these teams already has a match scheduled for this round"
+          : "One of these teams already has a match scheduled at this time",
       );
     }
 
@@ -258,6 +271,7 @@ const createMatchIntoDB = async (
         teamBId: payload.teamBId,
         round: payload.round,
         matchIndex: payload.matchIndex,
+        scheduledAt: payload.scheduledAt,
       },
     });
 

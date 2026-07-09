@@ -5,6 +5,8 @@ import { adminRoutes } from "../modules/admin/admin.route";
 import { postRoutes } from "../modules/post/post.routes";
 import { mediaRouter } from "../modules/media/media.route";
 import { tournamentRoute } from "../modules/tournament/tournament.route";
+import { challengeRoute } from "../modules/challenge/challenge.route";
+import { rewardRoute } from "../modules/reward/reward.route";
 
 const router = Router();
 
@@ -15,6 +17,8 @@ const moduleRoutes = [
   { path: "/posts", route: postRoutes },
   { path: "/media", route: mediaRouter },
   { path: "/tournament", route: tournamentRoute },
+  { path: "/challenge", route: challengeRoute },
+  { path: "/reward", route: rewardRoute },
 ];
 
 moduleRoutes.forEach((route) => {

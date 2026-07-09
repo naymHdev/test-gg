@@ -4,6 +4,7 @@ import sendResponse from "../../utils/sendResponse";
 import { postService } from "./post.service";
 import { Permission } from "../../../../generated/prisma/enums";
 import { uploadManyToS3 } from "../../utils/s3";
+import { prisma } from "../../../shared/prisma";
 
 const createPost = catchAsync(async (req, res) => {
   const userId = req.user.id;
@@ -89,14 +90,22 @@ const updatePost = catchAsync(async (req, res) => {
 });
 
 const deletePost = catchAsync(async (req, res) => {
-  // @ts-ignore
-  const { id: userId, role, permissions = [] } = req.user;
-  const hasDeletePermission =
-    role === "Owner" || permissions.includes(Permission.delete_content);
+  const { id: userId, role } = req.user;
+
+  let hasDeletePermission = role === "Owner";
+  if (!hasDeletePermission) {
+    const grantedPermissions = await prisma.userPermission.findMany({
+      where: { userId: userId as string },
+      select: { permission: true },
+    });
+    hasDeletePermission = grantedPermissions.some(
+      (p) => p.permission === Permission.delete_content,
+    );
+  }
 
   const result = await postService.deletePostFromDB(
     req.params.id as string,
-    { id: userId, role },
+    { id: userId as string, role },
     hasDeletePermission,
   );
   sendResponse(res, {
