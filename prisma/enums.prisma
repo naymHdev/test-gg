@@ -114,6 +114,13 @@ enum TeamMemberRole {
     Member
 }
 
+enum MatchStatus {
+    Scheduled
+    Live
+    Completed
+    Cancelled
+}
+
 // ===================== CHALLENGES / REWARDS =====================
 
 enum ChallengeDifficulty {

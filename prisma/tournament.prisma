@@ -44,13 +44,15 @@ model Team {
 
   createdAt DateTime @default(now())
 
-  // A user registers only one team per tournament — enforced via TeamMember unique constraint
+  @@unique([tournamentId, captainId])
   @@map("teams")
 }
 
 model TeamMember {
   teamId String
   team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  tournamentId String
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -59,6 +61,7 @@ model TeamMember {
   joinedAt DateTime       @default(now())
 
   @@id([teamId, userId])
+  @@unique([tournamentId, userId])
   @@map("team_members")
 }
 
@@ -78,6 +81,9 @@ model Match {
   round      Int
   matchIndex Int
 
+  scheduledAt DateTime
+  status      MatchStatus @default(Scheduled)
+
   declaredById String?
   declaredBy   User?     @relation("MatchDeclaredBy", fields: [declaredById], references: [id])
   declaredAt   DateTime?
@@ -85,5 +91,7 @@ model Match {
   createdAt DateTime @default(now())
 
   @@index([tournamentId, round])
+  @@index([teamAId, scheduledAt])
+  @@index([teamBId, scheduledAt])
   @@map("matches")
 }
