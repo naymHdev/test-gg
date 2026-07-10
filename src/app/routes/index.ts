@@ -7,6 +7,8 @@ import { mediaRouter } from "../modules/media/media.route";
 import { tournamentRoute } from "../modules/tournament/tournament.route";
 import { challengeRoute } from "../modules/challenge/challenge.route";
 import { rewardRoute } from "../modules/reward/reward.route";
+import { supportRouter } from "../modules/support/support.route";
+import { reportRouter } from "../modules/report/report.route";
 
 const router = Router();
 
@@ -19,6 +21,8 @@ const moduleRoutes = [
   { path: "/tournament", route: tournamentRoute },
   { path: "/challenge", route: challengeRoute },
   { path: "/reward", route: rewardRoute },
+  { path: "/support", route: supportRouter },
+  { path: "/report", route: reportRouter },
 ];
 
 moduleRoutes.forEach((route) => {
