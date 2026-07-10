@@ -8,9 +8,14 @@ import {
   createMatchValidation,
   declareMatchWinnerValidation,
 } from "../tournament/tournament.validation";
+import { createChallengeValidation } from "../challenge/challenge.validation";
+import { challengeController } from "../challenge/challenge.controller";
+import { createRewardValidation } from "../reward/reward.validation";
+import { rewardController } from "../reward/reward.controller";
 
 const router = Router();
 
+// ─── User management ────────────────────
 router.get(
   "/users",
   auth(Role.Admin, Role.Owner, Role.Moderator),
@@ -31,6 +36,7 @@ router.patch(
 
 // ─── Moderation (manage_tournaments) ────────────────────────────────────────
 
+// ─── Tournaments ────────────────────────────
 router.put(
   "/tournaments/:id/approve",
   auth(Role.Moderator, Role.Admin, Role.Owner),
@@ -61,6 +67,34 @@ router.put(
   auth(Role.Moderator, Role.Admin, Role.Owner),
   validateRequest(declareMatchWinnerValidation),
   tournamentController.declareMatchWinner,
+);
+
+// ─── Challenges ────────────────────────
+router.post(
+  "/challenge",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(createChallengeValidation),
+  challengeController.createChallenge,
+);
+
+router.patch(
+  "/challenge/:id/toggle-active",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  challengeController.toggleChallengeActive,
+);
+
+// ─── Rewards ────────────────
+router.post(
+  "/reward",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(createRewardValidation),
+  rewardController.createReward,
+);
+
+router.patch(
+  "/reward/:id/toggle-active",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  rewardController.toggleRewardActive,
 );
 
 export const adminRoutes = router;
