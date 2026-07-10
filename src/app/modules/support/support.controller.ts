@@ -1,2 +1,126 @@
+import httpStatus from "http-status";
+import catchAsync from "../../utils/catchAsync";
+import sendResponse from "../../utils/sendResponse";
+import { supportService } from "./support.service";
+import { Permission } from "../../../../generated/prisma/enums";
+import { prisma } from "../../../shared/prisma";
 
-export const supportController = {}
+/** Owner always has full access; Moderator/Admin need the explicit grant. */
+const hasViewSupportAccess = async (user: { role: string; id: string }) => {
+  if (user.role === "Owner") return true;
+
+  const grantedPermissions = await prisma.userPermission.findMany({
+    where: { userId: user.id },
+    select: { permission: true },
+  });
+
+  return grantedPermissions.some(
+    (p) => p.permission === Permission.view_support,
+  );
+};
+
+const openConversation = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const result = await supportService.openConversationIntoDB(
+    userId as string,
+    req.body,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: "Support conversation opened successfully",
+    data: result,
+  });
+});
+
+const sendMessage = catchAsync(async (req, res) => {
+  const { id: userId, role } = req.user;
+  const hasPermission = await hasViewSupportAccess(req.user);
+
+  const result = await supportService.sendMessageIntoDB(
+    req.params.id as string,
+    { id: userId as string, role },
+    hasPermission,
+    req.body,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: "Message sent successfully",
+    data: result,
+  });
+});
+
+const getMyConversations = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { conversations, meta } = await supportService.getMyConversationsFromDB(
+    userId as string,
+    req.query,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Conversations retrieved successfully",
+    meta,
+    data: conversations,
+  });
+});
+
+const getConversations = catchAsync(async (req, res) => {
+  const { conversations, meta } = await supportService.getConversationsFromDB(
+    req.query,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Conversations retrieved successfully",
+    meta,
+    data: conversations,
+  });
+});
+
+const getConversationById = catchAsync(async (req, res) => {
+  const { id: userId, role } = req.user;
+  const hasPermission = await hasViewSupportAccess(req.user);
+
+  const result = await supportService.getConversationByIdFromDB(
+    req.params.id as string,
+    { id: userId as string, role },
+    hasPermission,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Conversation retrieved successfully",
+    data: result,
+  });
+});
+
+const closeConversation = catchAsync(async (req, res) => {
+  const closedById = req.user.id;
+  const result = await supportService.closeConversationInDB(
+    req.params.id as string,
+    closedById as string,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Conversation closed successfully",
+    data: result,
+  });
+});
+
+export const supportController = {
+  openConversation,
+  sendMessage,
+  getMyConversations,
+  getConversations,
+  getConversationById,
+  closeConversation,
+};

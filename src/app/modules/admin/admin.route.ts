@@ -12,6 +12,8 @@ import { createChallengeValidation } from "../challenge/challenge.validation";
 import { challengeController } from "../challenge/challenge.controller";
 import { createRewardValidation } from "../reward/reward.validation";
 import { rewardController } from "../reward/reward.controller";
+import { reportController } from "../report/report.controller";
+import { supportController } from "../support/support.controller";
 
 const router = Router();
 
@@ -95,6 +97,45 @@ router.patch(
   "/reward/:id/toggle-active",
   auth(Role.Moderator, Role.Admin, Role.Owner),
   rewardController.toggleRewardActive,
+);
+
+// ─── Moderation (manage_reports) ────────────────────────────────────────────
+router.get(
+  "/reports",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  reportController.getReports,
+);
+
+router.get(
+  "/report/:id",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  reportController.getReportById,
+);
+
+router.put(
+  "/report/:id/resolve",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  reportController.resolveReport,
+);
+
+router.put(
+  "/report/:id/dismiss",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  reportController.dismissReport,
+);
+
+// ─── Moderation (view_support) ──────────────────────────────────────────────
+
+router.get(
+  "/support",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  supportController.getConversations,
+);
+
+router.put(
+  "/support/:id/close",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  supportController.closeConversation,
 );
 
 export const adminRoutes = router;

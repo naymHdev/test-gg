@@ -1,16 +1,18 @@
 model SupportConversation {
-  id         String                    @id @default(cuid())
-  userId     String
-  user       User                      @relation("SupportUser", fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("SupportUser", fields: [userId], references: [id], onDelete: Cascade)
 
-  status     SupportConversationStatus @default(Open)
-  openedAt   DateTime                  @default(now())
-  closedAt   DateTime?
+  status   SupportConversationStatus @default(Open)
+  openedAt DateTime                  @default(now())
+  closedAt DateTime?
 
   closedById String?
-  closedBy   User?                     @relation("SupportClosedBy", fields: [closedById], references: [id])
+  closedBy   User?   @relation("SupportClosedBy", fields: [closedById], references: [id])
 
-  messages   SupportMessage[]
+  createdAt DateTime @default(now())
+
+  messages SupportMessage[]
 
   @@index([userId, status])
   @@map("support_conversations")
@@ -21,12 +23,12 @@ model SupportMessage {
   conversationId String
   conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  senderId       String?
-  sender         User?               @relation(fields: [senderId], references: [id])
-  senderType     SupportSenderType
+  senderId   String?
+  sender     User?             @relation(fields: [senderId], references: [id])
+  senderType SupportSenderType
 
-  content        String
-  createdAt      DateTime            @default(now())
+  content   String
+  createdAt DateTime @default(now())
 
   @@index([conversationId])
   @@map("support_messages")
