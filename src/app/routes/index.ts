@@ -11,6 +11,7 @@ import { supportRouter } from "../modules/support/support.route";
 import { reportRouter } from "../modules/report/report.route";
 import { walletRouter } from "../modules/wallet/wallet.route";
 import { legalRouter } from "../modules/legal/legal.route";
+import { subscriptionRouter } from "../modules/subscription/subscription.routes";
 
 const router = Router();
 
@@ -27,6 +28,7 @@ const moduleRoutes = [
   { path: "/report", route: reportRouter },
   { path: "/wallet", route: walletRouter },
   { path: "/legal", route: legalRouter },
+  { path: "/premium", route: subscriptionRouter },
 ];
 
 moduleRoutes.forEach((route) => {

@@ -7,6 +7,7 @@ import router from "./app/routes";
 import notFound from "./app/middleware/notfound";
 import globalErrorHandler from "./app/middleware/globalErrorhandler";
 import { rateLimiter } from "./app/middleware/rateLimiter";
+import { handleSubscriptionWebhook } from "./app/modules/subscription/subscription.webhook";
 
 dotenv.config();
 
@@ -22,6 +23,26 @@ app.use(
     origin: (origin, callback) => callback(null, origin || true),
     credentials: true,
   }),
+);
+
+// Stripe needs the raw request body to verify the webhook signature, so this
+// must be registered before express.json() below.
+app.post(
+  "/api/webhooks/stripe/subscription",
+  express.raw({ type: "application/json" }),
+  async (req: Request, res: Response) => {
+    try {
+      await handleSubscriptionWebhook(
+        req.body,
+        req.headers["stripe-signature"] as string,
+      );
+      res.json({ received: true });
+    } catch (error: any) {
+      res
+        .status(error?.statusCode || 400)
+        .json({ received: false, message: error?.message });
+    }
+  },
 );
 
 app.use(express.json({ limit: "500mb" }));

@@ -1,19 +1,57 @@
+model SubscriptionPlan {
+  id          String  @id @default(cuid())
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(500)
+
+  price    Decimal         @db.Decimal(10, 2)
+  currency String          @default("usd") @db.VarChar(3)
+  interval BillingInterval
+
+  stripeProductId String @unique
+  stripePriceId   String @unique
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  features      PlanFeature[]
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model PlanFeature {
+  id     String           @id @default(cuid())
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  title       String  @db.VarChar(100)
+  description String? @db.VarChar(300)
+  order       Int     @default(0)
+
+  @@index([planId])
+  @@map("plan_features")
+}
+
 model Subscription {
-  id                   String             @id @default(cuid())
-  userId               String             @unique
-  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  status               SubscriptionStatus @default(Active)
-  plan                 SubscriptionPlan
-  price                Decimal            @db.Decimal(10, 2)
-  currency             String             @db.VarChar(3)
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
 
-  stripeSubId          String?            @unique
+  status SubscriptionStatus @default(Active)
+
+  stripeSubscriptionId String?   @unique
   currentPeriodStart   DateTime?
   currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
   cancelledAt          DateTime?
 
-  createdAt            DateTime           @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("subscriptions")
 }

@@ -54,3 +54,22 @@ export const sendAccountBannedEmail = (to: string, reason: string) =>
     "Your FinderQ account has been banned",
     `<p>Your account has been banned for the following reason:</p><p><b>${reason}</b></p><p>If you believe this is a mistake, please contact support.</p>`,
   );
+
+export const sendSubscriptionInvoiceEmail = (
+  to: string,
+  invoice: {
+    planName: string;
+    amount: string;
+    currency: string;
+    invoiceUrl?: string;
+    invoicePdf?: string;
+  },
+) =>
+  sendEmail(
+    to,
+    "Your FinderQ Premium receipt",
+    `<p>Thanks for subscribing to <b>${invoice.planName}</b>!</p>
+     <p>Amount charged: <b>${invoice.amount} ${invoice.currency}</b></p>
+     ${invoice.invoiceUrl ? `<p><a href="${invoice.invoiceUrl}">View your invoice</a></p>` : ""}
+     ${invoice.invoicePdf ? `<p><a href="${invoice.invoicePdf}">Download PDF receipt</a></p>` : ""}`,
+  );

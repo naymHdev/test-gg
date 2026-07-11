@@ -21,6 +21,11 @@ import {
   timeoutUserValidation,
   warnUserValidation,
 } from "./admin.validation";
+import { subscriptionController } from "../subscription/subscription.controller";
+import {
+  createPlanValidation,
+  updatePlanValidation,
+} from "../subscription/subscription.validation";
 
 const router = Router();
 
@@ -185,6 +190,33 @@ router.put(
   auth(Role.Moderator, Role.Admin, Role.Owner),
   validateRequest(upsertLegalDocumentValidation),
   legalController.upsertLegalDocument,
+);
+
+// ─── Subscription plans (manage_settings) ───────────────────────────────────
+router.get(
+  "/subscription-plans",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  subscriptionController.getAllPlans,
+);
+
+router.post(
+  "/subscription-plans",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(createPlanValidation),
+  subscriptionController.createPlan,
+);
+
+router.patch(
+  "/subscription-plans/:id",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(updatePlanValidation),
+  subscriptionController.updatePlan,
+);
+
+router.patch(
+  "/subscription-plans/:id/toggle-active",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  subscriptionController.togglePlanActive,
 );
 
 export const adminRoutes = router;

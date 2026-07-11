@@ -47,6 +47,7 @@ const nodemailer = {
 const stripe = {
   secret_key: process.env.STRIPE_SECRET_KEY,
   webhook_secret: process.env.STRIPE_WEBHOOK_SECRET,
+  subscription_webhook_secret: process.env.STRIPE_SUBSCRIPTION_WEBHOOK_SECRET,
 };
 
 const rateLimits = {

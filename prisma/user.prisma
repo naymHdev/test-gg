@@ -10,9 +10,10 @@ model User {
     accountLanguage Language // immutable after registration
     uiLanguage      Language @default(en)
 
-    isPremium      Boolean @default(false)
-    isRiotVerified Boolean @default(false)
-    riotAccount    Json?
+    isPremium        Boolean @default(false)
+    isRiotVerified   Boolean @default(false)
+    riotAccount      Json?
+    stripeCustomerId String? @unique
 
     warningCount Int       @default(0)
     timeoutUntil DateTime?

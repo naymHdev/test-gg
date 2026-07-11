@@ -169,11 +169,12 @@ enum ReportStatus {
 
 enum SubscriptionStatus {
     Active
+    PastDue
     Cancelled
     Expired
 }
 
-enum SubscriptionPlan {
+enum BillingInterval {
     Monthly
     Yearly
 }
@@ -198,4 +199,8 @@ enum NotificationType {
     warning_issued
     account_banned
     report_resolved
+    subscription_activated
+    subscription_renewed
+    subscription_cancelled
+    subscription_payment_failed
 }
