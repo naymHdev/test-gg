@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
 dotenv.config({ path: path.join(process.cwd(), ".env") });
+import type { StringValue } from "ms";
 
 const admin = {
   admin_email: process.env.ADMIN_EMAIL,
@@ -12,10 +13,17 @@ const admin = {
 const jwt = {
   access_secret: process.env.JWT_ACCESS_SECRET,
   refresh_secret: process.env.JWT_REFRESH_SECRET,
-  pending_secret: process.env.JWT_PENDING_SECRET, // short-lived token between OTP steps
-  access_expires_in: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
-  refresh_expires_in_default: process.env.JWT_REFRESH_EXPIRES_IN || "24h", // stayLoggedIn=false
-  refresh_expires_in_extended: process.env.JWT_REFRESH_EXPIRES_IN_EXT || "30d", // stayLoggedIn=true
+  pending_secret: process.env.JWT_PENDING_SECRET,
+
+  access_expires_in: (process.env.JWT_ACCESS_EXPIRES_IN ??
+    "15m") as StringValue,
+
+  refresh_expires_in_default: (process.env.JWT_REFRESH_EXPIRES_IN ??
+    "24h") as StringValue,
+
+  refresh_expires_in_extended: (process.env.JWT_REFRESH_EXPIRES_IN_EXT ??
+    "30d") as StringValue,
+
   bcrypt_salt_rounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 12,
 };
 

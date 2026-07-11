@@ -61,9 +61,12 @@ export const handleSubscriptionWebhook = async (
       const invoice = event.data.object as Stripe.Invoice;
       console.log("invoice.payment_failed", invoice);
       const subId =
+        //   @ts-ignore
         typeof invoice.subscription === "string"
-          ? invoice.subscription
-          : invoice.subscription?.id;
+          ? //   @ts-ignore
+            invoice.subscription
+          : //   @ts-ignore
+            invoice.subscription?.id;
       if (subId) {
         const stripeSub = await stripe.subscriptions.retrieve(subId);
         await subscriptionService.handleSubscriptionUpdated(stripeSub);

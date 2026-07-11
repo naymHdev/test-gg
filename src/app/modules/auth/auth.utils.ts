@@ -9,7 +9,7 @@ const verifyPendingToken = (token: string) =>
   jwt.verify(token, config.jwt.pending_secret as string) as { email: string };
 
 const signAccessToken = (payload: TJwtPayload) =>
-  jwt.sign(payload, config.jwt.access_secret as string, {
+  jwt.sign(payload, config.jwt.access_secret! as string, {
     // @ts-ignore
     expiresIn: config.jwt.access_expires_in,
   });
