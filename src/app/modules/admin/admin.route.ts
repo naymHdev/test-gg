@@ -16,6 +16,11 @@ import { reportController } from "../report/report.controller";
 import { supportController } from "../support/support.controller";
 import { upsertLegalDocumentValidation } from "../legal/legal.validation";
 import { legalController } from "../legal/legal.controller";
+import {
+  banUserValidation,
+  timeoutUserValidation,
+  warnUserValidation,
+} from "./admin.validation";
 
 const router = Router();
 
@@ -36,6 +41,40 @@ router.patch(
   "/users/:id/permissions",
   auth(Role.Admin, Role.Owner),
   adminController.upsertPermissions,
+);
+
+// ─── Moderation (ban_users / warn_users / timeout_users / view_activity) ────
+router.post(
+  "/users/:id/ban",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(banUserValidation),
+  adminController.banUser,
+);
+
+router.delete(
+  "/users/:id/ban",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  adminController.unbanUser,
+);
+
+router.post(
+  "/users/:id/warn",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(warnUserValidation),
+  adminController.warnUser,
+);
+
+router.post(
+  "/users/:id/timeout",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(timeoutUserValidation),
+  adminController.timeoutUser,
+);
+
+router.get(
+  "/activity-logs",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  adminController.getActivityLogs,
 );
 
 // ─── Moderation (manage_tournaments) ────────────────────────────────────────

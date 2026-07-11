@@ -47,3 +47,10 @@ export const sendResetPasswordEmail = (to: string, token: string) =>
     "Reset your FinderQ password",
     `<p>Click <a href="${config.client_url}/reset-password?token=${token}">here</a> to reset your password. This link expires in 30 minutes.</p>`,
   );
+
+export const sendAccountBannedEmail = (to: string, reason: string) =>
+  sendEmail(
+    to,
+    "Your FinderQ account has been banned",
+    `<p>Your account has been banned for the following reason:</p><p><b>${reason}</b></p><p>If you believe this is a mistake, please contact support.</p>`,
+  );
