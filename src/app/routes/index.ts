@@ -9,6 +9,8 @@ import { challengeRoute } from "../modules/challenge/challenge.route";
 import { rewardRoute } from "../modules/reward/reward.route";
 import { supportRouter } from "../modules/support/support.route";
 import { reportRouter } from "../modules/report/report.route";
+import { walletRouter } from "../modules/wallet/wallet.route";
+import { legalRouter } from "../modules/legal/legal.route";
 
 const router = Router();
 
@@ -23,6 +25,8 @@ const moduleRoutes = [
   { path: "/reward", route: rewardRoute },
   { path: "/support", route: supportRouter },
   { path: "/report", route: reportRouter },
+  { path: "/wallet", route: walletRouter },
+  { path: "/legal", route: legalRouter },
 ];
 
 moduleRoutes.forEach((route) => {

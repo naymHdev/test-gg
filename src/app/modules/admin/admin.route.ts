@@ -14,6 +14,8 @@ import { createRewardValidation } from "../reward/reward.validation";
 import { rewardController } from "../reward/reward.controller";
 import { reportController } from "../report/report.controller";
 import { supportController } from "../support/support.controller";
+import { upsertLegalDocumentValidation } from "../legal/legal.validation";
+import { legalController } from "../legal/legal.controller";
 
 const router = Router();
 
@@ -136,6 +138,14 @@ router.put(
   "/support/:id/close",
   auth(Role.Moderator, Role.Admin, Role.Owner),
   supportController.closeConversation,
+);
+
+// ─── Legal documents (manage_settings) ──────────────────────────────────────
+router.put(
+  "/legal",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(upsertLegalDocumentValidation),
+  legalController.upsertLegalDocument,
 );
 
 export const adminRoutes = router;
