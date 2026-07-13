@@ -203,4 +203,5 @@ enum NotificationType {
     subscription_renewed
     subscription_cancelled
     subscription_payment_failed
+    admin_announcement
 }

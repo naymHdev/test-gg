@@ -58,6 +58,13 @@ const stripe = {
   subscription_webhook_secret: process.env.STRIPE_SUBSCRIPTION_WEBHOOK_SECRET,
 };
 
+const firebase = {
+  service_account_json: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+};
+
 const rateLimits = {
   login_per_min: 5,
   otp_attempts: 5,
@@ -85,5 +92,6 @@ export default {
   aws,
   nodemailer,
   stripe,
+  firebase,
   rateLimits,
 };

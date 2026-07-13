@@ -8,6 +8,7 @@ import {
   NotificationType,
 } from "../../../../generated/prisma/client";
 import { CreateReportInput } from "./report.validation";
+import { notificationHelper } from "../notification/notification.helper";
 
 // ─── Report submission ──────────────────────────────────────────────────────
 
@@ -134,7 +135,16 @@ const finalizeReportInDB = async (
   resolverId: string,
   status: typeof ReportStatus.Resolved | typeof ReportStatus.Dismissed,
 ) => {
-  return prisma.$transaction(async (tx) => {
+  const title =
+    status === ReportStatus.Resolved
+      ? "Your report has been resolved"
+      : "Your report has been reviewed";
+  const body =
+    status === ReportStatus.Resolved
+      ? "Action has been taken based on your report. Thanks for helping keep the community safe."
+      : "After review, no action was taken on your report.";
+
+  const updatedReport = await prisma.$transaction(async (tx) => {
     const report = await tx.report.findUniqueOrThrow({
       where: { id: reportId },
     });
@@ -146,29 +156,25 @@ const finalizeReportInDB = async (
       );
     }
 
-    const updatedReport = await tx.report.update({
+    const updated = await tx.report.update({
       where: { id: reportId },
       data: { status, resolvedById: resolverId, resolvedAt: new Date() },
     });
 
-    await tx.notification.create({
-      data: {
-        userId: report.reporterId,
-        type: NotificationType.report_resolved,
-        title:
-          status === ReportStatus.Resolved
-            ? "Your report has been resolved"
-            : "Your report has been reviewed",
-        body:
-          status === ReportStatus.Resolved
-            ? "Action has been taken based on your report. Thanks for helping keep the community safe."
-            : "After review, no action was taken on your report.",
-        data: { reportId: report.id, targetType: report.targetType, status },
-      },
+    await notificationHelper.createNotification(tx, {
+      userId: report.reporterId,
+      type: NotificationType.report_resolved,
+      title,
+      body,
+      data: { reportId: report.id, targetType: report.targetType, status },
     });
 
-    return updatedReport;
+    return updated;
   });
+
+  notificationHelper.queuePush(updatedReport.reporterId, { title, body });
+
+  return updatedReport;
 };
 
 const resolveReportInDB = (reportId: string, resolverId: string) =>

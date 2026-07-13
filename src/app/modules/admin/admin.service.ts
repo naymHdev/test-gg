@@ -17,12 +17,13 @@ import {
   UserFilterQuery,
 } from "../../interface/contents.interface";
 import { logActivity } from "./admin.helper";
+import { sendAccountBannedEmail } from "../../utils/mailSender";
+import { notificationHelper } from "../notification/notification.helper";
 import {
   BanUserInput,
   TimeoutUserInput,
   WarnUserInput,
 } from "./admin.validation";
-import { sendAccountBannedEmail } from "../../utils/mailSender";
 
 const WARNING_COUNT_AUTO_BAN_THRESHOLD = 5;
 
@@ -122,14 +123,12 @@ const banUserInDB = async (
       data: { revokedAt: new Date() },
     });
 
-    await tx.notification.create({
-      data: {
-        userId,
-        type: NotificationType.account_banned,
-        title: "Your account has been banned",
-        body: payload.reason,
-        data: { reason: payload.reason, details: payload.details },
-      },
+    await notificationHelper.createNotification(tx, {
+      userId,
+      type: NotificationType.account_banned,
+      title: "Your account has been banned",
+      body: payload.reason,
+      data: { reason: payload.reason, details: payload.details },
     });
 
     await logActivity(tx, {
@@ -145,6 +144,10 @@ const banUserInDB = async (
 
   // fire-and-forget after commit, same reasoning as socket emits elsewhere
   sendAccountBannedEmail(bannedUser.email, payload.reason).catch(() => null);
+  notificationHelper.queuePush(userId, {
+    title: "Your account has been banned",
+    body: payload.reason,
+  });
 
   return bannedUser;
 };
@@ -217,8 +220,8 @@ const warnUserInDB = async (
     });
   }
 
-  return prisma.$transaction(async (tx) => {
-    const updated = await tx.user.update({
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedUser = await tx.user.update({
       where: { id: userId },
       data: {
         warningCount: newWarningCount,
@@ -226,14 +229,12 @@ const warnUserInDB = async (
       },
     });
 
-    await tx.notification.create({
-      data: {
-        userId,
-        type: NotificationType.warning_issued,
-        title: "You have received a warning",
-        body: payload.reason,
-        data: { reason: payload.reason, warningCount: newWarningCount },
-      },
+    await notificationHelper.createNotification(tx, {
+      userId,
+      type: NotificationType.warning_issued,
+      title: "You have received a warning",
+      body: payload.reason,
+      data: { reason: payload.reason, warningCount: newWarningCount },
     });
 
     await logActivity(tx, {
@@ -244,8 +245,15 @@ const warnUserInDB = async (
       metadata: { reason: payload.reason, warningCount: newWarningCount },
     });
 
-    return updated;
+    return updatedUser;
   });
+
+  notificationHelper.queuePush(userId, {
+    title: "You have received a warning",
+    body: payload.reason,
+  });
+
+  return updated;
 };
 
 // ─── Timeout ─────────────────────────────────────────────────────────────────

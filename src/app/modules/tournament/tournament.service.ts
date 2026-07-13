@@ -13,6 +13,7 @@ import {
   CreateTeamInput,
   CreateMatchInput,
 } from "./tournament.validation";
+import { notificationHelper } from "../notification/notification.helper";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -294,7 +295,9 @@ const declareMatchWinnerInDB = async (
   winnerId: string,
   declaredById: string,
 ) => {
-  return prisma.$transaction(async (tx) => {
+  const pushTargets: { userId: string; prize: number }[] = [];
+
+  const updatedMatch = await prisma.$transaction(async (tx) => {
     const match = await tx.match.findUniqueOrThrow({
       where: { id: matchId },
       include: { tournament: true },
@@ -356,25 +359,34 @@ const declareMatchWinnerInDB = async (
             },
           });
 
-          await tx.notification.create({
+          await notificationHelper.createNotification(tx, {
+            userId: member.userId,
+            type: NotificationType.tournament_winner,
+            title: "Your team won the tournament!",
+            body: `You earned ${prizePerMember} for winning "${match.tournament.name}".`,
             data: {
-              userId: member.userId,
-              type: NotificationType.tournament_winner,
-              title: "Your team won the tournament!",
-              body: `You earned ${prizePerMember} for winning "${match.tournament.name}".`,
-              data: {
-                tournamentId: match.tournamentId,
-                matchId: match.id,
-                prize: prizePerMember,
-              },
+              tournamentId: match.tournamentId,
+              matchId: match.id,
+              prize: prizePerMember,
             },
           });
+
+          pushTargets.push({ userId: member.userId, prize: prizePerMember });
         }
       }
     }
 
     return updatedMatch;
   });
+
+  pushTargets.forEach(({ userId, prize }) =>
+    notificationHelper.queuePush(userId, {
+      title: "Your team won the tournament!",
+      body: `You earned ${prize} for winning the tournament.`,
+    }),
+  );
+
+  return updatedMatch;
 };
 
 export const tournamentService = {

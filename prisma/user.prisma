@@ -73,6 +73,7 @@ model User {
     activityLogs ActivityLog[]
 
     notifications Notification[]
+    deviceTokens  DeviceToken[]
 
     @@index([region, accountLanguage])
     @@map("users")
@@ -131,4 +132,23 @@ model RefreshToken {
 
     @@index([userId])
     @@map("refresh_tokens")
+}
+
+// One row per device's FCM registration token — same shape as RefreshToken so
+// a user can be logged into (and pushed to) several devices at once. A token
+// gets pruned here the moment Firebase reports it as unregistered/invalid,
+// so the multicast list stays clean without a background job.
+model DeviceToken {
+    id     String @id @default(cuid())
+    userId String
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    token    String  @unique
+    platform String? // 'ios' | 'android' | 'web'
+
+    createdAt  DateTime @default(now())
+    lastSeenAt DateTime @updatedAt
+
+    @@index([userId])
+    @@map("device_tokens")
 }

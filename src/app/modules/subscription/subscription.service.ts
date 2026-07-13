@@ -10,6 +10,7 @@ import AppError from "../../error/AppError";
 import config from "../../config";
 import { stripe } from "../../../lib/stripe/stripe.client";
 import { sendSubscriptionInvoiceEmail } from "../../utils/mailSender";
+import { notificationHelper } from "../notification/notification.helper";
 import { CreatePlanInput, UpdatePlanInput } from "./subscription.validation";
 
 // ─── Admin: Plan CRUD (creates/keeps a matching Stripe Product + Price) ─────
@@ -311,15 +312,18 @@ const handleCheckoutSessionCompleted = async (
 
     await tx.user.update({ where: { id: userId }, data: { isPremium: true } });
 
-    await tx.notification.create({
-      data: {
-        userId,
-        type: NotificationType.subscription_activated,
-        title: "Premium activated",
-        body: "Your premium subscription is now active. Enjoy the perks!",
-        data: { planId },
-      },
+    await notificationHelper.createNotification(tx, {
+      userId,
+      type: NotificationType.subscription_activated,
+      title: "Premium activated",
+      body: "Your premium subscription is now active. Enjoy the perks!",
+      data: { planId },
     });
+  });
+
+  notificationHelper.queuePush(userId, {
+    title: "Premium activated",
+    body: "Your premium subscription is now active. Enjoy the perks!",
   });
 
   // fire-and-forget after commit, same reasoning as the ban email
@@ -362,14 +366,11 @@ const handleSubscriptionUpdated = async (stripeSub: Stripe.Subscription) => {
   });
 
   if (status === SubscriptionStatus.PastDue) {
-    await prisma.notification.create({
-      data: {
-        userId: existing.userId,
-        type: NotificationType.subscription_payment_failed,
-        title: "Payment failed",
-        body: "We couldn't renew your premium subscription. Please update your payment method.",
-        data: {},
-      },
+    await notificationHelper.notifyUser({
+      userId: existing.userId,
+      type: NotificationType.subscription_payment_failed,
+      title: "Payment failed",
+      body: "We couldn't renew your premium subscription. Please update your payment method.",
     });
   }
 };
@@ -391,15 +392,17 @@ const handleSubscriptionDeleted = async (stripeSub: Stripe.Subscription) => {
       data: { isPremium: false },
     });
 
-    await tx.notification.create({
-      data: {
-        userId: existing.userId,
-        type: NotificationType.subscription_cancelled,
-        title: "Premium subscription ended",
-        body: "Your premium subscription has ended.",
-        data: {},
-      },
+    await notificationHelper.createNotification(tx, {
+      userId: existing.userId,
+      type: NotificationType.subscription_cancelled,
+      title: "Premium subscription ended",
+      body: "Your premium subscription has ended.",
     });
+  });
+
+  notificationHelper.queuePush(existing.userId, {
+    title: "Premium subscription ended",
+    body: "Your premium subscription has ended.",
   });
 };
 

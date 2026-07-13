@@ -26,6 +26,8 @@ import {
   createPlanValidation,
   updatePlanValidation,
 } from "../subscription/subscription.validation";
+import { broadcastNotificationValidation } from "../notification/notification.validation";
+import { notificationController } from "../notification/notification.controller";
 
 const router = Router();
 
@@ -217,6 +219,14 @@ router.patch(
   "/subscription-plans/:id/toggle-active",
   auth(Role.Moderator, Role.Admin, Role.Owner),
   subscriptionController.togglePlanActive,
+);
+
+// ─── Notifications (manage_settings) ────────────────────────────────────────
+router.post(
+  "/notifications/broadcast",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(broadcastNotificationValidation),
+  notificationController.broadcastNotification,
 );
 
 export const adminRoutes = router;

@@ -7,6 +7,7 @@ import {
   CreateChallengeInput,
   UpdateChallengeProgressInput,
 } from "./challenge.validation";
+import { notificationHelper } from "../notification/notification.helper";
 
 // ─── Challenge CRUD ──────────────────────────────────────────────────────────
 const createChallengeIntoDB = async (
@@ -100,7 +101,9 @@ const updateChallengeProgressInDB = async (
   challengeId: string,
   payload: UpdateChallengeProgressInput,
 ) => {
-  return prisma.$transaction(async (tx) => {
+  let pushPayload: { title: string; body: string } | null = null;
+
+  const updatedEnrollment = await prisma.$transaction(async (tx) => {
     const enrollment = await tx.challengeEnrollment.findUnique({
       where: { challengeId_userId: { challengeId, userId } },
       include: { challenge: true },
@@ -153,19 +156,28 @@ const updateChallengeProgressInDB = async (
         },
       });
 
-      await tx.notification.create({
-        data: {
-          userId,
-          type: NotificationType.challenge_completed,
-          title: "Challenge completed!",
-          body: `You earned ${rewardPts} points and ${xp} XP for completing "${enrollment.challenge.title}".`,
-          data: { challengeId, rewardPts, xp },
-        },
+      await notificationHelper.createNotification(tx, {
+        userId,
+        type: NotificationType.challenge_completed,
+        title: "Challenge completed!",
+        body: `You earned ${rewardPts} points and ${xp} XP for completing "${enrollment.challenge.title}".`,
+        data: { challengeId, rewardPts, xp },
       });
+
+      pushPayload = {
+        title: "Challenge completed!",
+        body: `You earned ${rewardPts} points and ${xp} XP for completing "${enrollment.challenge.title}".`,
+      };
     }
 
     return updatedEnrollment;
   });
+
+  if (pushPayload) {
+    notificationHelper.queuePush(userId, pushPayload);
+  }
+
+  return updatedEnrollment;
 };
 
 export const challengeService = {
