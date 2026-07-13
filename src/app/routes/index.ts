@@ -13,6 +13,8 @@ import { walletRouter } from "../modules/wallet/wallet.route";
 import { legalRouter } from "../modules/legal/legal.route";
 import { subscriptionRouter } from "../modules/subscription/subscription.routes";
 import { notificationRouter } from "../modules/notification/notification.route";
+import { friendRouter } from "../modules/friend/friend.route";
+import { messageRouter } from "../modules/message/message.route";
 
 const router = Router();
 
@@ -31,6 +33,8 @@ const moduleRoutes = [
   { path: "/legal", route: legalRouter },
   { path: "/premium", route: subscriptionRouter },
   { path: "/notifications", route: notificationRouter },
+  { path: "/friends", route: friendRouter },
+  { path: "/messages", route: messageRouter },
 ];
 
 moduleRoutes.forEach((route) => {

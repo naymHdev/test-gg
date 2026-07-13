@@ -15,3 +15,10 @@ export const userSelect = {
   createdAt: true,
   updatedAt: true,
 } as const;
+
+export const userCard = {
+  id: true,
+  username: true,
+  profile: { select: { avatarUrl: true } },
+  isPremium: true,
+} as const;
