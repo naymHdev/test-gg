@@ -1,28 +1,41 @@
 model MediaPost {
-  id          String         @id @default(cuid())
-  userId      String
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  title       String         @db.VarChar(200)
+  title       String        @db.VarChar(200)
   description String?
-  imageUrl    String
+  images      MediaImage[]
   category    MediaCategory
   language    Language
 
-  likesCount    Int          @default(0)
-  dislikesCount Int          @default(0)
-  views         Int          @default(0)
-  isPremium     Boolean      @default(false)
+  reactionsCount Int     @default(0)
+  views          Int     @default(0)
+  isPremium      Boolean @default(false)
 
-  comments    MediaComment[]
-  likes       MediaLike[]
-  reports     Report[]
+  comments  MediaComment[]
+  reactions MediaReaction[]
+  reports   Report[]
 
-  createdAt   DateTime       @default(now())
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
   @@index([category, language, deletedAt])
   @@map("media_posts")
+}
+
+model MediaImage {
+  id          String    @id @default(cuid())
+  mediaPostId String
+  mediaPost   MediaPost @relation(fields: [mediaPostId], references: [id], onDelete: Cascade)
+
+  url   String
+  order Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([mediaPostId])
+  @@map("media_images")
 }
 
 model MediaComment {
@@ -30,28 +43,57 @@ model MediaComment {
   mediaPostId String
   mediaPost   MediaPost @relation(fields: [mediaPostId], references: [id], onDelete: Cascade)
 
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  content     String    @db.VarChar(300)
-  createdAt   DateTime  @default(now())
+  content String @db.VarChar(300)
+
+  parentId String?
+  parent   MediaComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies  MediaComment[] @relation("CommentReplies")
+
+  reactionsCount Int @default(0)
+
+  reactions MediaCommentReaction[]
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
   @@index([mediaPostId])
+  @@index([parentId])
   @@map("media_comments")
 }
 
-// Composite PK enforces "one like/dislike per user per post" — service layer
-// upserts here instead of insert, mirroring the singleton-upsert pattern
-// already used for commission-rate management.
-model MediaLike {
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+// one reaction per user per post — upsert pattern
+model MediaReaction {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   mediaPostId String
   mediaPost   MediaPost @relation(fields: [mediaPostId], references: [id], onDelete: Cascade)
 
-  type        LikeType
+  type ReactionType
+
+  createdAt DateTime @default(now())
 
   @@id([userId, mediaPostId])
-  @@map("media_likes")
+  @@index([mediaPostId, type]) // per-type count breakdown query fast korar jonno
+  @@map("media_reactions")
+}
+
+// one reaction per user per comment
+model MediaCommentReaction {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  mediaCommentId String
+  mediaComment   MediaComment @relation(fields: [mediaCommentId], references: [id], onDelete: Cascade)
+
+  type ReactionType
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, mediaCommentId])
+  @@index([mediaCommentId, type])
+  @@map("media_comment_reactions")
 }

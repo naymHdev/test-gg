@@ -73,6 +73,15 @@ enum Permission {
 
 // ===================== POSTS / MEDIA =====================
 
+enum ReactionType {
+    LIKE // Q reaction (thumbs/highlight)
+    HAHA
+    WOW
+    SAD
+    ANGRY
+    FIRE
+}
+
 enum PostType {
     RankedSoloDuo
     Clash

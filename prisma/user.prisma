@@ -41,10 +41,8 @@ model User {
     refreshTokens      RefreshToken[]
     bannedUsers        User[]           @relation("BannedByAdmin")
 
-    posts         Post[]
-    mediaPosts    MediaPost[]
-    mediaComments MediaComment[]
-    mediaLikes    MediaLike[]
+    posts      Post[]
+    mediaPosts MediaPost[]
 
     createdTournaments  Tournament[] @relation("TournamentCreator")
     approvedTournaments Tournament[] @relation("TournamentApprover")
@@ -72,8 +70,11 @@ model User {
 
     activityLogs ActivityLog[]
 
-    notifications Notification[]
-    deviceTokens  DeviceToken[]
+    notifications         Notification[]
+    deviceTokens          DeviceToken[]
+    mediaReactions        MediaReaction[]
+    mediaCommentReactions MediaCommentReaction[]
+    mediaComments         MediaComment[]
 
     @@index([region, accountLanguage])
     @@map("users")

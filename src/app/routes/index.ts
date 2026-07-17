@@ -3,7 +3,6 @@ import { authRoutes } from "../modules/auth/auth.routes";
 import { userRoutes } from "../modules/user/user.route";
 import { adminRoutes } from "../modules/admin/admin.route";
 import { postRoutes } from "../modules/post/post.routes";
-import { mediaRouter } from "../modules/media/media.route";
 import { tournamentRoute } from "../modules/tournament/tournament.route";
 import { challengeRoute } from "../modules/challenge/challenge.route";
 import { rewardRoute } from "../modules/reward/reward.route";
@@ -15,6 +14,7 @@ import { subscriptionRouter } from "../modules/subscription/subscription.routes"
 import { notificationRouter } from "../modules/notification/notification.route";
 import { friendRouter } from "../modules/friend/friend.route";
 import { messageRouter } from "../modules/message/message.route";
+import { mediaRouter } from "../modules/media/media.route";
 
 const router = Router();
 
@@ -23,7 +23,6 @@ const moduleRoutes = [
   { path: "/users", route: userRoutes },
   { path: "/admin", route: adminRoutes },
   { path: "/posts", route: postRoutes },
-  { path: "/media", route: mediaRouter },
   { path: "/tournament", route: tournamentRoute },
   { path: "/challenge", route: challengeRoute },
   { path: "/reward", route: rewardRoute },
@@ -35,6 +34,7 @@ const moduleRoutes = [
   { path: "/notifications", route: notificationRouter },
   { path: "/friends", route: friendRouter },
   { path: "/messages", route: messageRouter },
+  { path: "/media", route: mediaRouter },
 ];
 
 moduleRoutes.forEach((route) => {
