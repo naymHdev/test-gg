@@ -6,6 +6,7 @@ import { NotificationType } from "../../../../generated/prisma/client";
 import { SendMessageInput } from "./message.validation";
 import { notificationHelper } from "../notification/notification.helper";
 import { assertCanInteract } from "../friend/friend.service";
+import { emitToUser } from "../../../socket/socket";
 
 // ─── Conversation ────────────────────────────────────────────────────────────
 
@@ -88,8 +89,8 @@ const sendMessageIntoDB = async (
     body: preview,
   });
 
-  // TODO: socket.io not installed yet — emit "message:new" to receiverId's
-  // socket room here once socket is wired up.
+  // If socket.io not installed yet — emit "message:new" to receiverId's
+  emitToUser(receiverId, "message:new", message);
 
   return message;
 };

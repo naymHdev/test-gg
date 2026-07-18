@@ -8,6 +8,7 @@ import {
 import { SendFriendRequestInput } from "./friend.validation";
 import { notificationHelper } from "../notification/notification.helper";
 import { userCard } from "../../helpers/select";
+import { emitToUser } from "../../../socket/socket";
 
 const findFriendRowBetween = (userAId: string, userBId: string) =>
   prisma.friend.findFirst({
@@ -90,8 +91,8 @@ const sendFriendRequestIntoDB = async (
     body: "You have a new friend request.",
   });
 
-  // TODO: socket.io not installed yet — emit "friend_request:received" to
-  // targetId's socket room here once socket is wired up.
+  // If socket.io not installed yet — emit "friend_request:received" to
+  emitToUser(targetId, "friend_request:received", friendRequest);
 
   return friendRequest;
 };
@@ -156,8 +157,8 @@ const acceptFriendRequestInDB = async (
     body: "Your friend request was accepted.",
   });
 
-  // TODO: socket.io not installed yet — emit "friend_request:accepted" to
-  // updated.initiatorId's socket room here once socket is wired up.
+  // If socket.io not installed yet — emit "friend_request:accepted" to
+  emitToUser(updated.initiatorId, "friend_request:accepted", updated);
 
   return updated;
 };
@@ -166,7 +167,7 @@ const declineFriendRequestInDB = async (
   userId: string,
   friendRequestId: string,
 ) => {
-console.log({ friendRequestId });
+  console.log({ friendRequestId });
   const request = await prisma.friend.findUniqueOrThrow({
     where: { id: friendRequestId },
   });
@@ -261,6 +262,14 @@ const getMyFriendsFromDB = (userId: string) =>
     include: { target: { select: userCard } },
     orderBy: { updatedAt: "desc" },
   });
+
+export const getFriendIds = async (userId: string): Promise<string[]> => {
+  const rows = await prisma.friend.findMany({
+    where: { initiatorId: userId, status: FriendStatus.Accepted },
+    select: { targetId: true },
+  });
+  return rows.map((r) => r.targetId);
+};
 
 export const friendService = {
   sendFriendRequestIntoDB,
