@@ -70,11 +70,18 @@ model User {
 
     activityLogs ActivityLog[]
 
-    notifications         Notification[]
-    deviceTokens          DeviceToken[]
+    notifications Notification[]
+
+    deviceTokens DeviceToken[]
+
     mediaReactions        MediaReaction[]
     mediaCommentReactions MediaCommentReaction[]
     mediaComments         MediaComment[]
+
+    postReactions        PostReaction[]        @relation("PostReactionUser")
+    postComments         PostComment[]         @relation("PostCommentAuthor")
+    postCommentReplyTo   PostComment[]         @relation("PostCommentReplyTo")
+    postCommentReactions PostCommentReaction[] @relation("PostCommentReactionUser")
 
     @@index([region, accountLanguage])
     @@map("users")

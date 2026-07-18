@@ -55,6 +55,7 @@ const getPostsFromDB = async (query: Record<string, unknown>) => {
           profile: { select: { avatarUrl: true, rank: true } },
         },
       },
+      _count: { select: { postReactions: true, postComments: true } },
       images: true,
     },
   });

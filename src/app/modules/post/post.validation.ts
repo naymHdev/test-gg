@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { PostType, Region } from "../../../../generated/prisma/client";
+import {
+  PostType,
+  ReactionType,
+  Region,
+} from "../../../../generated/prisma/client";
 
 const tagSchema = z.object({
   text: z.string(),
@@ -38,3 +42,26 @@ export type UpdatePostInput = z.infer<typeof updatePostValidation>;
 export type UpdatePostPayload = UpdatePostInput & {
   images: string[];
 };
+
+export const reactToPostValidation = z.object({
+  type: z.nativeEnum(ReactionType, {
+    message: "Reaction type is required",
+  }),
+});
+export type ReactToPostInput = z.infer<typeof reactToPostValidation>;
+
+export const createPostCommentValidation = z.object({
+  content: z.string().min(1).max(300),
+  parentId: z.string().optional(),
+});
+
+export const updatePostCommentValidation = z.object({
+  content: z.string().min(1).max(300),
+});
+
+export type CreatePostCommentInput = z.infer<
+  typeof createPostCommentValidation
+>;
+export type UpdatePostCommentInput = z.infer<
+  typeof updatePostCommentValidation
+>;

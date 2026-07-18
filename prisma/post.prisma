@@ -16,12 +16,16 @@ model Post {
   isPremium      Boolean @default(false)
   trophyEarnings Decimal @default(0) @db.Decimal(10, 2)
 
+  reactionsCount Int @default(0)
+
   images  PostImage[]
   reports Report[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  postReactions PostReaction[]
+  postComments  PostComment[]
 
   @@index([region, language, deletedAt])
   @@index([createdAt])
@@ -41,4 +45,66 @@ model PostImage {
 
   @@index([postId])
   @@map("post_images")
+}
+
+model PostReaction {
+  userId String
+  user   User   @relation("PostReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  type ReactionType
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+  @@index([postId, type])
+  @@map("post_reactions")
+}
+
+model PostComment {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("PostCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+
+  content String @db.VarChar(300)
+
+  // flat structure — always points to the ROOT comment, unlimited "depth" collapses here
+  parentId String?
+  parent   PostComment?  @relation("PostCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies  PostComment[] @relation("PostCommentReplies")
+
+  // who this specific reply is "replying to" — for @tag display
+  replyToUserId String?
+  replyToUser   User?   @relation("PostCommentReplyTo", fields: [replyToUserId], references: [id], onDelete: SetNull)
+
+  reactionsCount Int                   @default(0)
+  reactions      PostCommentReaction[]
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@index([postId])
+  @@index([parentId])
+  @@map("post_comments")
+}
+
+model PostCommentReaction {
+  userId String
+  user   User   @relation("PostCommentReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  postCommentId String
+  postComment   PostComment @relation(fields: [postCommentId], references: [id], onDelete: Cascade)
+
+  type ReactionType
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, postCommentId])
+  @@index([postCommentId, type])
+  @@map("post_comment_reactions")
 }
