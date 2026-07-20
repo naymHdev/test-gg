@@ -1,0 +1,53 @@
+model VoiceChannel {
+    id                 String            @id @default(cuid())
+    name               String
+    description        String?
+    visibility         ChannelVisibility @default(Public)
+    maxParticipants    Int               @default(25)
+    isLocked           Boolean           @default(false)
+    waitingRoomEnabled Boolean           @default(false)
+    inviteCode         String            @unique @default(cuid())
+
+    // GetStream call reference — GetStream is source of truth for the live
+    // WebRTC session, this row is source of truth for ownership/permissions
+    streamCallId   String @unique
+    streamCallType String @default("audio_room")
+
+    ownerId String
+    owner   User   @relation("VoiceChannelOwner", fields: [ownerId], references: [id])
+
+    bans     VoiceChannelBan[]
+    requests WaitingRoomRequest[]
+
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    deletedAt DateTime?
+
+    @@index([ownerId])
+    @@map("voice_channels")
+}
+
+model VoiceChannelBan {
+    id        String       @id @default(cuid())
+    channelId String
+    channel   VoiceChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    userId    String
+    user      User         @relation("VoiceChannelBannedUser", fields: [userId], references: [id])
+    bannedAt  DateTime     @default(now())
+
+    @@unique([channelId, userId])
+    @@map("voice_channel_bans")
+}
+
+model WaitingRoomRequest {
+    id        String                   @id @default(cuid())
+    channelId String
+    channel   VoiceChannel             @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    userId    String
+    user      User                     @relation("VoiceChannelWaitingUser", fields: [userId], references: [id])
+    status    WaitingRoomRequestStatus @default(Pending)
+    createdAt DateTime                 @default(now())
+
+    @@unique([channelId, userId])
+    @@map("waiting_room_requests")
+}

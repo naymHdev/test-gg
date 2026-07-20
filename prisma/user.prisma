@@ -82,6 +82,9 @@ model User {
     postComments         PostComment[]         @relation("PostCommentAuthor")
     postCommentReplyTo   PostComment[]         @relation("PostCommentReplyTo")
     postCommentReactions PostCommentReaction[] @relation("PostCommentReactionUser")
+    voiceChannels        VoiceChannel[] @relation("VoiceChannelOwner")
+    voiceChannelBans     VoiceChannelBan[] @relation("VoiceChannelBannedUser")
+    waitingRoomRequests  WaitingRoomRequest[] @relation("VoiceChannelWaitingUser")
 
     @@index([region, accountLanguage])
     @@map("users")

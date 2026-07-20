@@ -214,3 +214,16 @@ enum NotificationType {
     subscription_payment_failed
     admin_announcement
 }
+
+// ===================== VOICE CHANNEL =====================
+
+enum ChannelVisibility {
+    Public
+    Private
+}
+
+enum WaitingRoomRequestStatus {
+    Pending
+    Accepted
+    Rejected
+}

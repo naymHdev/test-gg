@@ -15,6 +15,7 @@ import { notificationRouter } from "../modules/notification/notification.route";
 import { friendRouter } from "../modules/friend/friend.route";
 import { messageRouter } from "../modules/message/message.route";
 import { mediaRouter } from "../modules/media/media.route";
+import { channelRoutes } from "../channel/channel.route";
 
 const router = Router();
 
@@ -35,6 +36,7 @@ const moduleRoutes = [
   { path: "/friends", route: friendRouter },
   { path: "/messages", route: messageRouter },
   { path: "/media", route: mediaRouter },
+  { path: "/channels", route: channelRoutes },
 ];
 
 moduleRoutes.forEach((route) => {

@@ -75,6 +75,12 @@ const rateLimits = {
   presign_per_hour: 10,
 };
 
+const getStream = {
+  get_stream_api_key: process.env.GETSTREAM_API_KEY,
+  get_stream_api_secret: process.env.GETSTREAM_API_SECRET,
+  get_stream_token_expiry_seconds: process.env.GETSTREAM_TOKEN_EXPIRY_SECONDS,
+};
+
 export default {
   node_env: process.env.NODE_ENV,
   port: process.env.PORT || 5000,
@@ -94,4 +100,5 @@ export default {
   stripe,
   firebase,
   rateLimits,
+  getStream,
 };
