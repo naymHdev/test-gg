@@ -27,6 +27,19 @@ const getMyChannel = catchAsync(async (req, res) => {
   });
 });
 
+const getChannelByInviteCode = catchAsync(async (req, res) => {
+  const result = await channelService.getChannelByInviteCode(
+    req.params.inviteCode as string,
+    req.user.id,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Channel retrieved",
+    data: result,
+  });
+});
+
 const getPublicChannels = catchAsync(async (req, res) => {
   const result = await channelService.getPublicChannels();
   sendResponse(res, {
@@ -112,6 +125,7 @@ const deleteChannel = catchAsync(async (req, res) => {
 export const channelController = {
   createChannel,
   getMyChannel,
+  getChannelByInviteCode,
   getPublicChannels,
   joinChannel,
   listWaitingRoomRequests,

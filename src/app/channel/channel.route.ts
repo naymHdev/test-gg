@@ -22,6 +22,12 @@ router.get(
   channelController.getMyChannel,
 );
 
+router.get(
+  "/invite/:inviteCode",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.getChannelByInviteCode,
+);
+
 router.post(
   "/:channelId/join",
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
