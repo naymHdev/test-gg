@@ -34,10 +34,10 @@ export const upsertStreamUser = async (user: {
 };
 
 export const generateStreamUserToken = (userId: string) => {
-  return streamClient.generateUserToken({
-    user_id: userId,
-    validity_in_seconds: config.getStream.get_stream_token_expiry_seconds as
-      | number
-      | undefined,
-  });
+  const iat = Math.floor(Date.now() / 1000) - 60;
+  const validitySeconds =
+    Number(config.getStream.get_stream_token_expiry_seconds) || 3600;
+  const exp = iat + validitySeconds;
+
+  return streamClient.generateUserToken({ user_id: userId, iat, exp });
 };

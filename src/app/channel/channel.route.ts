@@ -16,6 +16,12 @@ router.post(
   channelController.createChannel,
 );
 
+router.get(
+  "/mine",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.getMyChannel,
+);
+
 router.post(
   "/:channelId/join",
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),

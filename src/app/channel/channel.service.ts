@@ -2,11 +2,7 @@ import httpStatus from "http-status";
 import { nanoid } from "nanoid";
 import { prisma } from "../../shared/prisma";
 import AppError from "../error/AppError";
-import {
-  generateStreamUserToken,
-  streamClient,
-  upsertStreamUser,
-} from "../../lib/getstream/client";
+import { generateStreamUserToken, streamClient, upsertStreamUser } from "../../lib/getstream/client";
 
 const STREAM_CALL_TYPE = "audio_room";
 
@@ -47,18 +43,33 @@ const createChannel = async (
     },
   });
 
-  const channel = await prisma.voiceChannel.create({
-    data: {
-      name: payload.name,
-      description: payload.description,
-      visibility: payload.visibility,
-      maxParticipants: payload.maxParticipants,
-      waitingRoomEnabled: payload.waitingRoomEnabled,
-      ownerId,
-      streamCallId,
-      streamCallType: STREAM_CALL_TYPE,
-    },
-  });
+  // From this point on, the Stream call exists — if the DB write below
+  // fails, we must clean it up ourselves. Prisma's $transaction cannot do
+  // this: it only wraps Postgres statements, GetStream is a separate
+  // system with no shared transaction boundary.
+  let channel;
+  try {
+    channel = await prisma.voiceChannel.create({
+      data: {
+        name: payload.name,
+        description: payload.description,
+        visibility: payload.visibility,
+        maxParticipants: payload.maxParticipants,
+        waitingRoomEnabled: payload.waitingRoomEnabled,
+        ownerId,
+        streamCallId,
+        streamCallType: STREAM_CALL_TYPE,
+      },
+    });
+  } catch (err) {
+    // compensating action — remove the orphan call so it doesn't linger
+    // on Stream's side with no matching DB row
+    await call.delete({ hard: true }).catch(() => {
+      // best-effort cleanup; log this in production (e.g. Sentry) so an
+      // orphaned call doesn't silently sit on the Stream dashboard
+    });
+    throw err;
+  }
 
   const token = generateStreamUserToken(ownerId);
 
@@ -224,6 +235,48 @@ const assertOwner = async (channelId: string, ownerId: string) => {
   return channel;
 };
 
+// -------------------- PRIVATE CHANNEL ACCESS --------------------
+// Private channels are never listed publicly — a user reaches one only by
+// owning it or by having the invite code (shared out-of-band by the owner).
+const getMyChannel = async (ownerId: string) => {
+  const channel = await prisma.voiceChannel.findFirst({
+    where: { ownerId, deletedAt: null },
+  });
+  if (!channel) {
+    throw new AppError(httpStatus.NOT_FOUND, "You don't own an active channel");
+  }
+  return channel;
+};
+
+const getChannelByInviteCode = async (inviteCode: string, userId: string) => {
+  const channel = await prisma.voiceChannel.findFirst({
+    where: { inviteCode, deletedAt: null },
+  });
+  if (!channel) throw new AppError(httpStatus.NOT_FOUND, "Invalid invite link");
+
+  const isBanned = await prisma.voiceChannelBan.findUnique({
+    where: { channelId_userId: { channelId: channel.id, userId } },
+  });
+  if (isBanned) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "You are banned from this channel",
+    );
+  }
+
+  // don't leak internal fields (streamCallId etc.) at the preview stage —
+  // the client calls /join afterwards to actually get a Stream token
+  return {
+    id: channel.id,
+    name: channel.name,
+    description: channel.description,
+    visibility: channel.visibility,
+    maxParticipants: channel.maxParticipants,
+    isLocked: channel.isLocked,
+    waitingRoomEnabled: channel.waitingRoomEnabled,
+  };
+};
+
 const getPublicChannels = async () => {
   return prisma.voiceChannel.findMany({
     where: { visibility: "Public", deletedAt: null, isLocked: false },
@@ -240,4 +293,6 @@ export const channelService = {
   banParticipant,
   deleteChannel,
   getPublicChannels,
+  getMyChannel,
+  getChannelByInviteCode,
 };
