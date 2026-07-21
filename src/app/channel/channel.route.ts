@@ -96,4 +96,31 @@ router.patch(
   channelController.transferOwnership,
 );
 
+// -------------------- CHAT --------------------
+router.get(
+  "/:channelId/messages",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.listMessages,
+);
+
+router.post(
+  "/:channelId/messages",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(channelValidation.sendChannelMessageValidation),
+  channelController.sendMessage,
+);
+
+router.patch(
+  "/:channelId/messages/:messageId",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(channelValidation.editChannelMessageValidation),
+  channelController.editMessage,
+);
+
+router.delete(
+  "/:channelId/messages/:messageId",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.deleteMessage,
+);
+
 export const channelRoutes = router;

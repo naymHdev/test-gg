@@ -2,6 +2,7 @@ import httpStatus from "http-status";
 import { channelService } from "./channel.service";
 import catchAsync from "../utils/catchAsync";
 import sendResponse from "../utils/sendResponse";
+import { channelMessageService } from "./channel-message.service";
 
 const createChannel = catchAsync(async (req, res) => {
   const result = await channelService.createChannel(
@@ -206,6 +207,64 @@ const transferOwnership = catchAsync(async (req, res) => {
   });
 });
 
+const sendMessage = catchAsync(async (req, res) => {
+  const result = await channelMessageService.sendMessage(
+    req.params.channelId as string,
+    req.user.id,
+    req.body,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: "Message sent",
+    data: result,
+  });
+});
+
+const editMessage = catchAsync(async (req, res) => {
+  const result = await channelMessageService.editMessage(
+    req.params.channelId as string,
+    req.params.messageId as string,
+    req.user.id,
+    req.body.content,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Message updated",
+    data: result,
+  });
+});
+
+const deleteMessage = catchAsync(async (req, res) => {
+  const result = await channelMessageService.deleteMessage(
+    req.params.channelId as string,
+    req.params.messageId as string,
+    req.user.id,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Message deleted",
+    data: result,
+  });
+});
+
+const listMessages = catchAsync(async (req, res) => {
+  const result = await channelMessageService.listMessages(
+    req.params.channelId as string,
+    req.user.id,
+    req.query.cursor as string | undefined,
+    req.query.limit ? Number(req.query.limit) : undefined,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Messages retrieved",
+    data: result,
+  });
+});
+
 export const channelController = {
   createChannel,
   getMyChannel,
@@ -223,4 +282,9 @@ export const channelController = {
   deafenParticipant,
   unDeafenParticipant,
   transferOwnership,
+
+  sendMessage,
+  editMessage,
+  deleteMessage,
+  listMessages,
 };
