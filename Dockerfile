@@ -11,6 +11,13 @@ RUN bun install --frozen-lockfile
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# prisma.config.ts resolves DATABASE_URL eagerly even for `generate` (which
+# doesn't actually connect to a DB, just parses schema) — a syntactically
+# valid placeholder unblocks the build. The real connection string comes
+# from docker-compose at runtime and never touches this build stage.
+ENV DATABASE_URL="postgresql://user:password@localhost:5432/placeholder?schema=public"
+
 RUN bunx prisma generate
 
 # ---- Production ----
