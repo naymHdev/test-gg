@@ -7,6 +7,7 @@ import {
   streamClient,
   upsertStreamUser,
 } from "../../lib/getstream/client";
+import { emitToChannel, emitToUser } from "../../socket/socket";
 
 const STREAM_CALL_TYPE = "audio_room";
 
@@ -274,6 +275,78 @@ const unmuteParticipant = async (
   return { channelId, unmutedUserId: targetUserId };
 };
 
+const deafenParticipant = async (
+  channelId: string,
+  ownerId: string,
+  targetUserId: string,
+) => {
+  await assertOwner(channelId, ownerId);
+  emitToUser(targetUserId, "channel:deafen_requested", { channelId });
+  emitToChannel(channelId, "channel:user_deafened", {
+    channelId,
+    userId: targetUserId,
+  });
+  return { channelId, deafenedUserId: targetUserId, enforced: false };
+};
+
+const unDeafenParticipant = async (
+  channelId: string,
+  ownerId: string,
+  targetUserId: string,
+) => {
+  await assertOwner(channelId, ownerId);
+  emitToUser(targetUserId, "channel:undeafen_requested", { channelId });
+  emitToChannel(channelId, "channel:user_undeafened", {
+    channelId,
+    userId: targetUserId,
+  });
+  return { channelId, undeafenedUserId: targetUserId, enforced: false };
+};
+
+const transferOwnership = async (
+  channelId: string,
+  currentOwnerId: string,
+  newOwnerId: string,
+) => {
+  const channel = await assertOwner(channelId, currentOwnerId);
+  if (newOwnerId === currentOwnerId) {
+    throw new AppError(httpStatus.BAD_REQUEST, "You already own this channel");
+  }
+
+  const isBanned = await prisma.voiceChannelBan.findUnique({
+    where: { channelId_userId: { channelId, userId: newOwnerId } },
+  });
+  if (isBanned) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Cannot transfer ownership to a banned user",
+    );
+  }
+
+  const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
+  // demote old owner to a regular member, promote the new one to admin —
+  // Stream's own call-level role, separate from our DB ownerId
+  await call.updateCallMembers({
+    update_members: [
+      { user_id: newOwnerId, role: "admin" },
+      { user_id: currentOwnerId, role: "user" },
+    ],
+  });
+
+  const updated = await prisma.voiceChannel.update({
+    where: { id: channelId },
+    data: { ownerId: newOwnerId },
+  });
+
+  emitToChannel(channelId, "channel:ownership_transferred", {
+    channelId,
+    previousOwnerId: currentOwnerId,
+    newOwnerId,
+  });
+
+  return updated;
+};
+
 // -------------------- LEAVE / DELETE --------------------
 const deleteChannel = async (channelId: string, ownerId: string) => {
   const channel = await assertOwner(channelId, ownerId);
@@ -363,6 +436,9 @@ export const channelService = {
   kickParticipant,
   muteParticipant,
   unmuteParticipant,
+  deafenParticipant,
+  unDeafenParticipant,
+  transferOwnership,
 
   getPublicChannels,
   getMyChannel,

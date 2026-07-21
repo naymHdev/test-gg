@@ -18,6 +18,7 @@ model VoiceChannel {
 
     bans     VoiceChannelBan[]
     requests WaitingRoomRequest[]
+    messages ChannelMessage[]
 
     createdAt DateTime  @default(now())
     updatedAt DateTime  @updatedAt
@@ -37,6 +38,30 @@ model VoiceChannelBan {
 
     @@unique([channelId, userId])
     @@map("voice_channel_bans")
+}
+
+model ChannelMessage {
+    id        String       @id @default(cuid())
+    channelId String
+    channel   VoiceChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    senderId  String
+    sender    User         @relation("ChannelMessageSender", fields: [senderId], references: [id])
+
+    content    String?
+    imageUrl   String?
+    fileUrl    String?
+    mentionIds String[] @default([])
+
+    replyToId String?
+    replyTo   ChannelMessage?  @relation("ChannelMessageReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+    replies   ChannelMessage[] @relation("ChannelMessageReply")
+
+    isEdited  Boolean   @default(false)
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    deletedAt DateTime?
+
+    @@index([channelId, createdAt])
 }
 
 model WaitingRoomRequest {

@@ -77,4 +77,23 @@ router.post(
   channelController.unmuteParticipant,
 );
 
+router.post(
+  "/:channelId/deafen/:userId",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.deafenParticipant,
+);
+
+router.post(
+  "/:channelId/undeafen/:userId",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.unDeafenParticipant,
+);
+
+router.patch(
+  "/:channelId/transfer-ownership",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(channelValidation.transferOwnershipValidation),
+  channelController.transferOwnership,
+);
+
 export const channelRoutes = router;

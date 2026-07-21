@@ -164,6 +164,48 @@ const unmuteParticipant = catchAsync(async (req, res) => {
   });
 });
 
+const deafenParticipant = catchAsync(async (req, res) => {
+  const result = await channelService.deafenParticipant(
+    req.params.channelId as string,
+    req.user.id,
+    req.params.userId as string,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Deafen requested (advisory — client must honor it)",
+    data: result,
+  });
+});
+
+const unDeafenParticipant = catchAsync(async (req, res) => {
+  const result = await channelService.unDeafenParticipant(
+    req.params.channelId as string,
+    req.user.id,
+    req.params.userId as string,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Undeafen requested",
+    data: result,
+  });
+});
+
+const transferOwnership = catchAsync(async (req, res) => {
+  const result = await channelService.transferOwnership(
+    req.params.channelId as string,
+    req.user.id,
+    req.body.newOwnerId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Ownership transferred",
+    data: result,
+  });
+});
+
 export const channelController = {
   createChannel,
   getMyChannel,
@@ -178,4 +220,7 @@ export const channelController = {
   kickParticipant,
   muteParticipant,
   unmuteParticipant,
+  deafenParticipant,
+  unDeafenParticipant,
+  transferOwnership,
 };

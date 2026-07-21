@@ -96,6 +96,26 @@ const onConnection = async (socket: AuthedSocket) => {
     io.to(`user:${senderId}`).emit("message:read", { by: userId });
   });
 
+  // ---- Voice channel real-time room ----
+  // Client calls this right after a successful /join REST call (once it has
+  // a streamToken) so it starts receiving channel-scoped broadcasts
+  // (user joined/left, muted, kicked, chat messages, etc).
+  socket.on("channel:join", ({ channelId }: { channelId: string }) => {
+    if (!channelId) return;
+    socket.join(`channel:${channelId}`);
+    socket
+      .to(`channel:${channelId}`)
+      .emit("channel:user_joined", { channelId, userId });
+  });
+
+  socket.on("channel:leave", ({ channelId }: { channelId: string }) => {
+    if (!channelId) return;
+    socket.leave(`channel:${channelId}`);
+    socket
+      .to(`channel:${channelId}`)
+      .emit("channel:user_left", { channelId, userId });
+  });
+
   socket.on("disconnect", async () => {
     console.log(`🔌 Socket disconnected: ${socket.id} (user: ${userId})`);
 
@@ -129,6 +149,15 @@ export const getIO = () => {
 export const emitToUser = (userId: string, event: string, payload: unknown) => {
   if (!io) return;
   io.to(`user:${userId}`).emit(event, payload);
+};
+
+export const emitToChannel = (
+  channelId: string,
+  event: string,
+  payload: unknown,
+) => {
+  if (!io) return;
+  io.to(`channel:${channelId}`).emit(event, payload);
 };
 
 export const isUserOnline = (userId: string) => userSockets.has(userId);

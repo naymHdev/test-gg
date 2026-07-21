@@ -22,8 +22,31 @@ const waitingRoomDecisionValidation = z.object({
   accept: z.boolean(),
 });
 
+const transferOwnershipValidation = z.object({
+  newOwnerId: z.string().min(1),
+});
+
+const sendChannelMessageValidation = z
+  .object({
+    content: z.string().min(1).max(2000).optional(),
+    imageUrl: z.string().url().optional(),
+    fileUrl: z.string().url().optional(),
+    mentionIds: z.array(z.string()).max(20).optional(),
+    replyToId: z.string().optional(),
+  })
+  .refine((data) => data.content || data.imageUrl || data.fileUrl, {
+    message: "Message must have content, an image, or a file",
+  });
+
+const editChannelMessageValidation = z.object({
+  content: z.string().min(1).max(2000),
+});
+
 export const channelValidation = {
   createChannelValidation,
   updateChannelValidation,
   waitingRoomDecisionValidation,
+  transferOwnershipValidation,
+  sendChannelMessageValidation,
+  editChannelMessageValidation,
 };
