@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Voice Channel Test</title>
+</head>
+
+<body>
+    <h3>Owner — Audio Room Test</h3>
+    <button id="joinBtn">Join + Go Live</button>
+    <button id="micBtn">Toggle Mic</button>
+    <div id="status"></div>
+
+    <script type="module">
+        import { StreamVideoClient } from "https://esm.sh/@stream-io/video-client@latest";
+
+        const API_KEY = "uawjt6hcfc8p"; // Stream Dashboard থেকে
+        const USER_ID = "cc7f71bd-ba8d-4d37-a6b3-c0ab5bfc030c"; // যে user এর token
+        const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiY2M3ZjcxYmQtYmE4ZC00ZDM3LWE2YjMtYzBhYjViZmMwMzBjIiwiaWF0IjoxNzg0NjExMTcwLCJleHAiOjE3ODQ2MTQ3NzB9.-1IOmnbGV5eDVNyl2J3dNRh3kLySPlYt0jLTbNopEHY";
+        const CALL_TYPE = "audio_room";
+        const CALL_ID = "LSS3utDVsX4c"; // streamCallId
+
+        let call;
+        const statusEl = document.getElementById("status");
+
+        document.getElementById("joinBtn").onclick = async () => {
+            statusEl.innerText = "Connecting...";
+            try {
+                const client = new StreamVideoClient({ apiKey: API_KEY });
+
+                // token set হওয়া পর্যন্ত এখানে wait হবে
+                await client.connectUser({ id: USER_ID }, TOKEN);
+
+                call = client.call(CALL_TYPE, CALL_ID);
+                await call.join({ create: false });
+                await call.microphone.enable();
+                await call.goLive();
+
+                statusEl.innerText = "✅ Live — mic on, others can join now";
+            } catch (err) {
+                statusEl.innerText = "❌ " + err.message;
+                console.error(err);
+            }
+        };
+
+        document.getElementById("micBtn").onclick = async () => {
+            if (call) await call.microphone.toggle();
+        };
+    </script>
+</body>
+
+</html>
