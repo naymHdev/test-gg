@@ -122,6 +122,48 @@ const deleteChannel = catchAsync(async (req, res) => {
   });
 });
 
+const kickParticipant = catchAsync(async (req, res) => {
+  const result = await channelService.kickParticipant(
+    req.params.channelId as string,
+    req.user.id,
+    req.params.userId as string,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Participant kicked",
+    data: result,
+  });
+});
+
+const muteParticipant = catchAsync(async (req, res) => {
+  const result = await channelService.muteParticipant(
+    req.params.channelId as string,
+    req.user.id,
+    req.params.userId as string,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Participant muted",
+    data: result,
+  });
+});
+
+const unmuteParticipant = catchAsync(async (req, res) => {
+  const result = await channelService.unmuteParticipant(
+    req.params.channelId as string,
+    req.user.id,
+    req.params.userId as string,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Participant unmuted",
+    data: result,
+  });
+});
+
 export const channelController = {
   createChannel,
   getMyChannel,
@@ -130,6 +172,10 @@ export const channelController = {
   joinChannel,
   listWaitingRoomRequests,
   respondToWaitingRoomRequest,
+
   banParticipant,
   deleteChannel,
+  kickParticipant,
+  muteParticipant,
+  unmuteParticipant,
 };

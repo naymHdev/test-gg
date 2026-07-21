@@ -2,7 +2,11 @@ import httpStatus from "http-status";
 import { nanoid } from "nanoid";
 import { prisma } from "../../shared/prisma";
 import AppError from "../error/AppError";
-import { generateStreamUserToken, streamClient, upsertStreamUser } from "../../lib/getstream/client";
+import {
+  generateStreamUserToken,
+  streamClient,
+  upsertStreamUser,
+} from "../../lib/getstream/client";
 
 const STREAM_CALL_TYPE = "audio_room";
 
@@ -207,6 +211,69 @@ const banParticipant = async (
   });
 };
 
+const kickParticipant = async (
+  channelId: string,
+  ownerId: string,
+  targetUserId: string,
+) => {
+  const channel = await assertOwner(channelId, ownerId);
+  if (targetUserId === ownerId) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Owner cannot kick themselves");
+  }
+
+  const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
+  // kickUser removes them from the live call immediately. Unlike ban,
+  // block defaults to false — they're free to /join again right away.
+  await call.kickUser({ user_id: targetUserId });
+
+  return { channelId, kickedUserId: targetUserId };
+};
+
+const muteParticipant = async (
+  channelId: string,
+  ownerId: string,
+  targetUserId: string,
+) => {
+  const channel = await assertOwner(channelId, ownerId);
+  if (targetUserId === ownerId) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Owner cannot mute themselves");
+  }
+
+  const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
+
+  // Two steps, both needed:
+  // 1) muteUsers — cuts their live audio track immediately
+  await call.muteUsers({ user_ids: [targetUserId], audio: true });
+  // 2) revoke send-audio — without this, the participant's client can just
+  //    turn their mic back on a second later; muteUsers alone is a one-time
+  //    action, not a standing restriction
+  await call.updateUserPermissions({
+    user_id: targetUserId,
+    revoke_permissions: ["send-audio"],
+  });
+
+  return { channelId, mutedUserId: targetUserId };
+};
+
+const unmuteParticipant = async (
+  channelId: string,
+  ownerId: string,
+  targetUserId: string,
+) => {
+  const channel = await assertOwner(channelId, ownerId);
+
+  const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
+  // There's no "force unmute" — a server can silence a mic, never turn one
+  // on remotely. This just restores the participant's own ability to
+  // unmute; they still have to do it from their end.
+  await call.updateUserPermissions({
+    user_id: targetUserId,
+    grant_permissions: ["send-audio"],
+  });
+
+  return { channelId, unmutedUserId: targetUserId };
+};
+
 // -------------------- LEAVE / DELETE --------------------
 const deleteChannel = async (channelId: string, ownerId: string) => {
   const channel = await assertOwner(channelId, ownerId);
@@ -290,8 +357,13 @@ export const channelService = {
   joinChannel,
   listWaitingRoomRequests,
   respondToWaitingRoomRequest,
+
   banParticipant,
   deleteChannel,
+  kickParticipant,
+  muteParticipant,
+  unmuteParticipant,
+
   getPublicChannels,
   getMyChannel,
   getChannelByInviteCode,

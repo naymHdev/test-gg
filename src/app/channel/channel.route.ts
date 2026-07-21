@@ -59,4 +59,22 @@ router.delete(
   channelController.deleteChannel,
 );
 
+router.post(
+  "/:channelId/kick/:userId",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.kickParticipant,
+);
+
+router.post(
+  "/:channelId/mute/:userId",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.muteParticipant,
+);
+
+router.post(
+  "/:channelId/unmute/:userId",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  channelController.unmuteParticipant,
+);
+
 export const channelRoutes = router;
