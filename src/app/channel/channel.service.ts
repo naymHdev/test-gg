@@ -48,10 +48,6 @@ const createChannel = async (
     },
   });
 
-  // From this point on, the Stream call exists — if the DB write below
-  // fails, we must clean it up ourselves. Prisma's $transaction cannot do
-  // this: it only wraps Postgres statements, GetStream is a separate
-  // system with no shared transaction boundary.
   let channel;
   try {
     channel = await prisma.voiceChannel.create({
@@ -67,12 +63,7 @@ const createChannel = async (
       },
     });
   } catch (err) {
-    // compensating action — remove the orphan call so it doesn't linger
-    // on Stream's side with no matching DB row
-    await call.delete({ hard: true }).catch(() => {
-      // best-effort cleanup; log this in production (e.g. Sentry) so an
-      // orphaned call doesn't silently sit on the Stream dashboard
-    });
+    await call.delete({ hard: true }).catch(() => {});
     throw err;
   }
 
@@ -117,6 +108,10 @@ const joinChannel = async (
       const request = await prisma.waitingRoomRequest.create({
         data: { channelId, userId },
       });
+      emitToUser(channel.ownerId, "waiting_room:new_request", {
+        channelId,
+        request,
+      });
       return { status: "waiting_room" as const, request };
     }
 
@@ -130,7 +125,6 @@ const joinChannel = async (
         "Your request to join was rejected by the owner",
       );
     }
-    // status === "Accepted" → fall through and issue a token
   }
 
   await upsertStreamUser({ id: userId, username });
@@ -188,6 +182,12 @@ const respondToWaitingRoomRequest = async (
     });
   }
 
+  emitToUser(
+    request.userId,
+    accept ? "waiting_room:accepted" : "waiting_room:rejected",
+    { channelId },
+  );
+
   return updated;
 };
 
@@ -205,11 +205,19 @@ const banParticipant = async (
   const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
   await call.updateCallMembers({ remove_members: [targetUserId] });
 
-  return prisma.voiceChannelBan.upsert({
+  const banRecord = await prisma.voiceChannelBan.upsert({
     where: { channelId_userId: { channelId, userId: targetUserId } },
     update: {},
     create: { channelId, userId: targetUserId },
   });
+
+  emitToUser(targetUserId, "channel:banned", { channelId });
+  emitToChannel(channelId, "channel:user_banned", {
+    channelId,
+    userId: targetUserId,
+  });
+
+  return banRecord;
 };
 
 const kickParticipant = async (
@@ -223,9 +231,13 @@ const kickParticipant = async (
   }
 
   const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
-  // kickUser removes them from the live call immediately. Unlike ban,
-  // block defaults to false — they're free to /join again right away.
   await call.kickUser({ user_id: targetUserId });
+
+  emitToUser(targetUserId, "channel:kicked", { channelId });
+  emitToChannel(channelId, "channel:user_kicked", {
+    channelId,
+    userId: targetUserId,
+  });
 
   return { channelId, kickedUserId: targetUserId };
 };
@@ -242,15 +254,16 @@ const muteParticipant = async (
 
   const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
 
-  // Two steps, both needed:
-  // 1) muteUsers — cuts their live audio track immediately
   await call.muteUsers({ user_ids: [targetUserId], audio: true });
-  // 2) revoke send-audio — without this, the participant's client can just
-  //    turn their mic back on a second later; muteUsers alone is a one-time
-  //    action, not a standing restriction
   await call.updateUserPermissions({
     user_id: targetUserId,
     revoke_permissions: ["send-audio"],
+  });
+
+  emitToUser(targetUserId, "channel:muted", { channelId });
+  emitToChannel(channelId, "channel:user_muted", {
+    channelId,
+    userId: targetUserId,
   });
 
   return { channelId, mutedUserId: targetUserId };
@@ -264,12 +277,15 @@ const unmuteParticipant = async (
   const channel = await assertOwner(channelId, ownerId);
 
   const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
-  // There's no "force unmute" — a server can silence a mic, never turn one
-  // on remotely. This just restores the participant's own ability to
-  // unmute; they still have to do it from their end.
   await call.updateUserPermissions({
     user_id: targetUserId,
     grant_permissions: ["send-audio"],
+  });
+
+  emitToUser(targetUserId, "channel:unmuted", { channelId });
+  emitToChannel(channelId, "channel:user_unmuted", {
+    channelId,
+    userId: targetUserId,
   });
 
   return { channelId, unmutedUserId: targetUserId };
@@ -324,8 +340,6 @@ const transferOwnership = async (
   }
 
   const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
-  // demote old owner to a regular member, promote the new one to admin —
-  // Stream's own call-level role, separate from our DB ownerId
   await call.updateCallMembers({
     update_members: [
       { user_id: newOwnerId, role: "admin" },
@@ -354,10 +368,14 @@ const deleteChannel = async (channelId: string, ownerId: string) => {
   const call = streamClient.video.call(STREAM_CALL_TYPE, channel.streamCallId);
   await call.end();
 
-  return prisma.voiceChannel.update({
+  const updated = await prisma.voiceChannel.update({
     where: { id: channelId },
     data: { deletedAt: new Date() },
   });
+
+  emitToChannel(channelId, "channel:deleted", { channelId });
+
+  return updated;
 };
 
 // -------------------- helpers --------------------
@@ -376,8 +394,6 @@ const assertOwner = async (channelId: string, ownerId: string) => {
 };
 
 // -------------------- PRIVATE CHANNEL ACCESS --------------------
-// Private channels are never listed publicly — a user reaches one only by
-// owning it or by having the invite code (shared out-of-band by the owner).
 const getMyChannel = async (ownerId: string) => {
   const channel = await prisma.voiceChannel.findFirst({
     where: { ownerId, deletedAt: null },
@@ -404,8 +420,6 @@ const getChannelByInviteCode = async (inviteCode: string, userId: string) => {
     );
   }
 
-  // don't leak internal fields (streamCallId etc.) at the preview stage —
-  // the client calls /join afterwards to actually get a Stream token
   return {
     id: channel.id,
     name: channel.name,
