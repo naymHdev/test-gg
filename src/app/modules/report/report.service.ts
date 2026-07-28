@@ -56,6 +56,7 @@ const createReportIntoDB = async (
       }
       reportedUserId = mediaPost.userId;
       mediaPostId = mediaPost.id;
+      // @ts-ignore
       snapshot = { title: mediaPost.title, imageUrl: mediaPost.imageUrl };
     }
 
