@@ -18,9 +18,36 @@ const app: Express = express();
 app.set("trust proxy", 1);
 
 app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:3002",
+  "http://localhost:3003",
+
+  "https://finderq.gg",
+  "https://www.finderq.gg",
+
+  "https://api.finderq.gg",
+
+  "https://dashboard.finderq.gg",
+  "https://www.dashboard.finderq.gg",
+];
+
 app.use(
   cors({
-    origin: (origin, callback) => callback(null, origin || true),
+    origin(origin, callback) {
+      // Allow Postman, curl, server-to-server requests
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
   }),
 );
