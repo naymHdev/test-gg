@@ -89,7 +89,6 @@ const verifyRegisterOtp = async (
   });
 
   await redis.del(pendingRegKey(email));
-
   return issueTokenPair(user.id, user.role, false, deviceMeta);
 };
 

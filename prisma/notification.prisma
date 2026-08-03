@@ -1,15 +1,15 @@
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type      NotificationType
-  title     String
-  body      String
-  data      Json?
+  type  NotificationType
+  title String
+  body  String
+  data  Json?
 
-  isRead    Boolean          @default(false)
-  createdAt DateTime         @default(now())
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@index([userId, isRead])
   @@map("notifications")
@@ -19,7 +19,7 @@ model Notification {
 // agreedToTerms/agreedToPrivacy booleans on User; this table stores the actual content
 model LegalDocument {
   id        String   @id @default(cuid())
-  type      String   @db.VarChar(50)   // 'privacy_policy' | 'terms'
+  type      String   @db.VarChar(50)
   version   String   @db.VarChar(20)
   content   String
   isLatest  Boolean  @default(false)

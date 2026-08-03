@@ -13,6 +13,10 @@ model Tournament {
   startDate DateTime
   status    TournamentStatus @default(Pending)
 
+  logo  String?
+  cover String?
+  image String?
+
   approvedById String?
   approvedBy   User?     @relation("TournamentApprover", fields: [approvedById], references: [id])
   approvedAt   DateTime?

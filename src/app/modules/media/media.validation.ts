@@ -39,11 +39,13 @@ export type ReactToMediaInput = z.infer<typeof reactToMediaValidation>;
 export type CreateMediaPostPayload = z.infer<typeof createMediaPostValidation>;
 export type CreateMediaPostInput = CreateMediaPostPayload & {
   images: string[];
+  mediaVideos?: string[];
 };
 
 export type UpdateMediaPostInput = z.infer<typeof updateMediaPostValidation>;
 export type UpdateMediaPostPayload = UpdateMediaPostInput & {
   images?: string[];
+  mediaVideos?: string[];
 };
 
 // ----- Comments --------------------------

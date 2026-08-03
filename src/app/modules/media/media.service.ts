@@ -6,12 +6,15 @@ import { userCard } from "../../helpers/select";
 import QueryBuilder from "../../builder/QueryBuilder";
 
 const createMedia = async (userId: string, data: CreateMediaPostInput) => {
-  const { images, ...rest } = data;
+  const { images, mediaVideos, ...rest } = data;
 
-  if (!images || images.length === 0) {
+  if (
+    (!images || images.length === 0) &&
+    (!mediaVideos || mediaVideos.length === 0)
+  ) {
     throw new AppError(
       httpStatus.BAD_REQUEST,
-      "At least one image is required",
+      "At least one image or video is required",
     );
   }
 
@@ -20,11 +23,18 @@ const createMedia = async (userId: string, data: CreateMediaPostInput) => {
       ...rest,
       userId,
       images: {
-        create: images.map((url, index) => ({ url, order: index })),
+        create: (images ?? []).map((url, index) => ({ url, order: index })),
+      },
+      mediaVideos: {
+        create: (mediaVideos ?? []).map((url, index) => ({
+          url,
+          order: index,
+        })),
       },
     },
     include: {
       images: { orderBy: { order: "asc" } },
+      mediaVideos: { orderBy: { order: "asc" } },
       user: { select: userCard },
     },
   });

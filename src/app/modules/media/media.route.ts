@@ -13,6 +13,7 @@ import {
   updateMediaCommentValidation,
   updateMediaPostValidation,
 } from "./media.validation";
+import { uploadMulterDisk } from "../../utils/s3";
 
 const router = Router();
 
@@ -22,8 +23,9 @@ router.get("/:id", mediaController.getSingleMedia);
 
 router.post(
   "/",
-  uploadFactory({ type: "image", maxFiles: 10 }).fields([
+  uploadMulterDisk.fields([
     { name: "images", maxCount: 10 },
+    { name: "videos", maxCount: 10 },
   ]),
   parseData(),
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
@@ -34,9 +36,7 @@ router.post(
 
 router.patch(
   "/:id",
-  uploadFactory({ type: "image", maxFiles: 10 }).fields([
-    { name: "images", maxCount: 10 },
-  ]),
+  uploadMulterDisk.fields([{ name: "images", maxCount: 10 }]),
   parseData(),
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
   validateRequest(updateMediaPostValidation),

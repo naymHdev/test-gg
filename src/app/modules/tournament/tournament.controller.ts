@@ -5,6 +5,7 @@ import AppError from "../../error/AppError";
 import { tournamentService } from "./tournament.service";
 import { Permission } from "../../../../generated/prisma/enums";
 import { prisma } from "../../../shared/prisma";
+import { uploadManyToS3 } from "../../utils/s3";
 
 /** Owner always has full access; Moderator/Admin need the explicit grant. */
 const assertManageTournamentsAccess = async (user: {
@@ -32,9 +33,57 @@ const assertManageTournamentsAccess = async (user: {
 
 const createTournament = catchAsync(async (req, res) => {
   const creatorId = req.user.id;
+  const body = req.body;
+  const files = req.files as {
+    logo?: Express.Multer.File[];
+    cover?: Express.Multer.File[];
+    image?: Express.Multer.File[];
+  };
+
+  const filesToUpload: {
+    file: Express.Multer.File;
+    path: string;
+    key: string;
+  }[] = [];
+
+  if (files?.logo?.[0]) {
+    filesToUpload.push({
+      file: files.logo[0],
+      path: "tournaments/logo",
+      key: "logo",
+    });
+  }
+  if (files?.cover?.[0]) {
+    filesToUpload.push({
+      file: files.cover[0],
+      path: "tournaments/cover",
+      key: "cover",
+    });
+  }
+  if (files?.image?.[0]) {
+    filesToUpload.push({
+      file: files.image[0],
+      path: "tournaments/image",
+      key: "image",
+    });
+  }
+
+  let uploaded: Record<string, string> = {};
+
+  if (filesToUpload.length > 0) {
+    const results = await uploadManyToS3(filesToUpload);
+    filesToUpload.forEach((f, idx) => {
+      uploaded[f.key] = results[idx].url;
+    });
+  }
+
+  if (uploaded.logo) body.logo = uploaded.logo;
+  if (uploaded.cover) body.cover = uploaded.cover;
+  if (uploaded.image) body.image = uploaded.image;
+
   const result = await tournamentService.createTournamentIntoDB(
     creatorId as string,
-    req.body,
+    body,
   );
 
   sendResponse(res, {

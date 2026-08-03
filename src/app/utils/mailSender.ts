@@ -3,8 +3,6 @@ import httpStatus from "http-status";
 import AppError from "../error/AppError";
 import config from "../config";
 
-// Singleton transporter — reused across calls instead of reconnecting to SMTP
-// every time (same reasoning as the prisma/redis singleton clients).
 const transporter = nodemailer.createTransport({
   host: config.nodemailer.host,
   port: Number(config.nodemailer.port),

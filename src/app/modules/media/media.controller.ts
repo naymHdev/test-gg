@@ -1,7 +1,7 @@
 import httpStatus from "http-status";
 import catchAsync from "../../utils/catchAsync";
 import pick from "../../utils/pick";
-import { uploadManyToS3 } from "../../utils/s3";
+import { deleteManyFromS3, uploadManyToS3 } from "../../utils/s3";
 import sendResponse from "../../utils/sendResponse";
 import { mediaService } from "./media.service";
 import { mediaReactionService } from "./reaction/media-reaction.service";
@@ -10,29 +10,57 @@ import { mediaCommentService } from "./media-comment.service";
 const createMedia = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const body = req.body;
-  const files = req.files as { images?: Express.Multer.File[] };
+  const files = req.files as {
+    images?: Express.Multer.File[];
+    videos?: Express.Multer.File[];
+  };
 
   const imageFiles = files?.images ?? [];
+  const videoFiles = files?.videos ?? [];
+
   let uploadedImages: string[] = [];
-  if (imageFiles.length > 0) {
-    const formattedFiles = imageFiles.map((file) => ({
-      file,
-      path: "media",
-    }));
+  let uploadedVideos: string[] = [];
 
-    const uploadResults = await uploadManyToS3(formattedFiles);
-    uploadedImages = uploadResults.map((item) => item.url);
+  try {
+    if (imageFiles.length > 0) {
+      const formattedFiles = imageFiles.map((file) => ({
+        file,
+        path: "media/images",
+      }));
+      const uploadResults = await uploadManyToS3(formattedFiles);
+      uploadedImages = uploadResults.map((item) => item.url);
+    }
+
+    if (videoFiles.length > 0) {
+      const formattedFiles = videoFiles.map((file) => ({
+        file,
+        path: "media/videos",
+      }));
+      const uploadResults = await uploadManyToS3(formattedFiles);
+      uploadedVideos = uploadResults.map((item) => item.url);
+    }
+
+    body.images = uploadedImages;
+    body.mediaVideos = uploadedVideos;
+
+    const result = await mediaService.createMedia(userId, body);
+
+    sendResponse(res, {
+      statusCode: httpStatus.CREATED,
+      success: true,
+      message: "Post created successfully",
+      data: result,
+    });
+  } catch (error) {
+    // rollback: DB creation fail hole S3 theke uploaded file gulo delete kore dao
+    const allUrls = [...uploadedImages, ...uploadedVideos];
+    if (allUrls.length > 0) {
+      await deleteManyFromS3(allUrls).catch(() => {
+        // log but don't block error propagation
+      });
+    }
+    throw error;
   }
-
-  body.images = uploadedImages;
-  const result = await mediaService.createMedia(userId, body);
-
-  sendResponse(res, {
-    statusCode: httpStatus.CREATED,
-    success: true,
-    message: "Post created successfully",
-    data: result,
-  });
 });
 
 const getAllMedia = catchAsync(async (req, res) => {

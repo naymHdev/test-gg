@@ -6,6 +6,7 @@ model MediaPost {
   title       String        @db.VarChar(200)
   description String?
   images      MediaImage[]
+  mediaVideos MediaVideo[]
   category    MediaCategory
   language    Language
 
@@ -17,8 +18,8 @@ model MediaPost {
   reactions MediaReaction[]
   reports   Report[]
 
-  createdAt DateTime  @default(now())
-  deletedAt DateTime?
+  createdAt   DateTime     @default(now())
+  deletedAt   DateTime?
 
   @@index([category, language, deletedAt])
   @@map("media_posts")
@@ -36,6 +37,20 @@ model MediaImage {
 
   @@index([mediaPostId])
   @@map("media_images")
+}
+
+model MediaVideo {
+  id          String    @id @default(cuid())
+  mediaPostId String
+  mediaPost   MediaPost @relation(fields: [mediaPostId], references: [id], onDelete: Cascade)
+
+  url   String
+  order Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([mediaPostId])
+  @@map("media_videos")
 }
 
 model MediaComment {

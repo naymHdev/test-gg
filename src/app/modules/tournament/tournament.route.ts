@@ -8,6 +8,8 @@ import {
   createTournamentValidation,
   createTeamValidation,
 } from "./tournament.validation";
+import { uploadMulterDisk } from "../../utils/s3";
+import parseData from "../../middleware/parseData";
 
 const router = Router();
 
@@ -20,6 +22,12 @@ router.get("/:id", optionalAuth, tournamentController.getTournamentById);
 
 router.post(
   "/",
+  uploadMulterDisk.fields([
+    { name: "logo", maxCount: 1 },
+    { name: "cover", maxCount: 1 },
+    { name: "image", maxCount: 1 },
+  ]),
+  parseData(),
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
   validateRequest(createTournamentValidation),
   tournamentController.createTournament,

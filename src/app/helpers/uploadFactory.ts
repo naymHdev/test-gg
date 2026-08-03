@@ -1,7 +1,8 @@
+// upload.factory.ts
 import multer from "multer";
 import { memoryStorage } from "multer";
 
-type UploadType = "image" | "file" | "mixed";
+type UploadType = "image" | "file" | "video" | "mixed";
 
 interface UploadOptions {
   type?: UploadType;
@@ -13,6 +14,13 @@ const storage = memoryStorage();
 
 const MIME_TYPES = {
   image: ["image/jpeg", "image/png", "image/jpg", "image/webp"],
+  video: [
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+    "video/x-matroska",
+    "video/x-msvideo",
+  ],
   file: [
     "application/pdf",
     "application/msword",
@@ -42,17 +50,25 @@ export const uploadFactory = ({
           : cb(new Error("Only image files are allowed"));
       }
 
+      if (type === "video") {
+        return MIME_TYPES.video.includes(file.mimetype)
+          ? cb(null, true)
+          : cb(new Error("Only video files are allowed"));
+      }
+
       if (type === "file") {
-        return MIME_TYPES.image.includes(file.mimetype)
-          ? cb(new Error("Image files are not allowed"))
+        return MIME_TYPES.image.includes(file.mimetype) ||
+          MIME_TYPES.video.includes(file.mimetype)
+          ? cb(new Error("Image/video files are not allowed"))
           : cb(null, true);
       }
 
       // mixed
       const isImage = MIME_TYPES.image.includes(file.mimetype);
+      const isVideo = MIME_TYPES.video.includes(file.mimetype);
       const isFile = MIME_TYPES.file.includes(file.mimetype);
 
-      if (isImage || isFile) {
+      if (isImage || isVideo || isFile) {
         cb(null, true);
       } else {
         cb(new Error("Unsupported file type"));
