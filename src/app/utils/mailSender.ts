@@ -71,3 +71,33 @@ export const sendSubscriptionInvoiceEmail = (
      ${invoice.invoiceUrl ? `<p><a href="${invoice.invoiceUrl}">View your invoice</a></p>` : ""}
      ${invoice.invoicePdf ? `<p><a href="${invoice.invoicePdf}">Download PDF receipt</a></p>` : ""}`,
   );
+
+export const sendPasswordChangedEmail = (to: string) =>
+  sendEmail(
+    to,
+    "Your FinderQ password was changed",
+    `<p>Your password was just changed. If this wasn't you, please reset your password immediately and contact support.</p>`,
+  );
+
+export const sendTwoFactorToggledEmail = (to: string, enabled: boolean) =>
+  sendEmail(
+    to,
+    `Two-factor authentication ${enabled ? "enabled" : "disabled"}`,
+    `<p>Two-factor authentication (login verification code) has been <b>${
+      enabled ? "enabled" : "disabled"
+    }</b> on your account. If you didn't make this change, please contact support immediately.</p>`,
+  );
+
+export const sendAccountDeactivatedEmail = (to: string) =>
+  sendEmail(
+    to,
+    "Your FinderQ account has been deactivated",
+    `<p>Your account has been temporarily deactivated. Simply log back in at any time to reactivate it.</p>`,
+  );
+
+export const sendAccountDeletedEmail = (to: string) =>
+  sendEmail(
+    to,
+    "Your FinderQ account has been deleted",
+    `<p>Your account and associated personal data have been permanently deleted, as requested.</p>`,
+  );

@@ -42,7 +42,6 @@ router.put(
   authController.resetPassword,
 );
 
-// "which devices am I logged in on" + force-logout a specific one
 router.get(
   "/sessions",
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
@@ -52,6 +51,26 @@ router.delete(
   "/sessions/:id",
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
   authController.revokeSession,
+);
+
+router.put(
+  "/change-password",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(authValidation.changePasswordValidation),
+  authController.changePassword,
+);
+
+router.patch(
+  "/two-factor",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(authValidation.toggleTwoFactorValidation),
+  authController.toggleTwoFactor,
+);
+
+router.get(
+  "/login-history",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  authController.getLoginHistory,
 );
 
 export const authRoutes = router;

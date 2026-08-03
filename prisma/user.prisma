@@ -15,6 +15,11 @@ model User {
     riotAccount      Json?
     stripeCustomerId String? @unique
 
+    twoFactorEnabled          Boolean @default(true)
+    emailNotifications        Boolean @default(true)
+    newMessageNotifications   Boolean @default(true)
+    systemUpdateNotifications Boolean @default(true)
+
     warningCount Int       @default(0)
     timeoutUntil DateTime?
 

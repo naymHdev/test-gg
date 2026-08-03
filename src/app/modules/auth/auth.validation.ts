@@ -88,10 +88,25 @@ const resetPasswordValidation = z.object({
     .regex(/[0-9]/),
 });
 
+const changePasswordValidation = z.object({
+  currentPassword: z.string({ message: "Current password is required" }),
+  newPassword: z
+    .string({ message: "New password is required" })
+    .min(8)
+    .regex(/[A-Z]/, "Must contain at least 1 uppercase letter")
+    .regex(/[0-9]/, "Must contain at least 1 number"),
+});
+
+const toggleTwoFactorValidation = z.object({
+  enabled: z.boolean({ message: "enabled is required" }),
+});
+
 export const authValidation = {
   registerValidation,
   loginValidation,
   verifyOtpValidation,
   forgotPasswordValidation,
   resetPasswordValidation,
+  changePasswordValidation,
+  toggleTwoFactorValidation,
 };

@@ -3,6 +3,8 @@ import { UserController } from "./user.controller";
 import auth from "../../middleware/auth";
 import { Role } from "../../../../generated/prisma/client";
 import { uploadFactory } from "../../helpers/uploadFactory";
+import validateRequest from "../../middleware/validateRequest";
+import { userValidation } from "./user.validation";
 
 const router = Router();
 
@@ -37,6 +39,26 @@ router.get(
   "/presence",
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
   UserController.getPresence,
+);
+
+router.patch(
+  "/notification-settings",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(userValidation.notificationSettingsValidation),
+  UserController.updateNotificationSettings,
+);
+
+router.patch(
+  "/deactivate",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  UserController.deactivateAccount,
+);
+
+router.delete(
+  "/account",
+  auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(userValidation.deleteAccountValidation),
+  UserController.deleteAccount,
 );
 
 export const userRoutes = router;

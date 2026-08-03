@@ -42,12 +42,30 @@ const verifyOtp = catchAsync(async (req, res) => {
 });
 
 const login = catchAsync(async (req, res) => {
-  const result = await authService.loginWithCredentials(req.body);
+  const deviceMeta = extractDeviceMeta(req);
+  const result = await authService.loginWithCredentials(req.body, deviceMeta);
+
+  if (!result.twoFactorRequired) {
+    setRefreshCookie(res, result.refreshToken);
+    return sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Logged in successfully",
+      data: {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      },
+    });
+  }
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "OTP sent to your email",
-    data: result,
+    data: {
+      pendingToken: result.pendingToken,
+      stayLoggedIn: result.stayLoggedIn,
+    },
   });
 });
 
@@ -99,7 +117,6 @@ const resetPassword = catchAsync(async (req, res) => {
   });
 });
 
-// HttpOnly cookie, matches the `refresh-token` cookie name already used in refreshToken()
 function setRefreshCookie(res: any, token: string) {
   res.cookie("refresh-token", token, {
     httpOnly: true,
@@ -132,6 +149,44 @@ const revokeSession = catchAsync(async (req, res) => {
   });
 });
 
+const changePassword = catchAsync(async (req, res) => {
+  // @ts-ignore
+  const userId = req.user.id;
+  const { currentPassword, newPassword } = req.body;
+  await authService.changePassword(userId, currentPassword, newPassword);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Password changed successfully",
+    data: null,
+  });
+});
+
+const toggleTwoFactor = catchAsync(async (req, res) => {
+  // @ts-ignore
+  const userId = req.user.id;
+  const result = await authService.toggleTwoFactor(userId, req.body.enabled);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: `Two-factor authentication ${result.twoFactorEnabled ? "enabled" : "disabled"}`,
+    data: result,
+  });
+});
+
+const getLoginHistory = catchAsync(async (req, res) => {
+  // @ts-ignore
+  const userId = req.user.id;
+  const result = await authService.getLoginHistory(userId, req.query);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Login history retrieved",
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
 export const authController = {
   register,
   verifyOtp,
@@ -142,4 +197,7 @@ export const authController = {
   resetPassword,
   getSessions,
   revokeSession,
+  changePassword,
+  toggleTwoFactor,
+  getLoginHistory,
 };

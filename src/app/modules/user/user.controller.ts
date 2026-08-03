@@ -19,8 +19,6 @@ const getUserProfile = catchAsync(async (req, res) => {
 const updateProfile = catchAsync(async (req, res) => {
   const { username } = req.user;
   const body = req.body;
-
-  console.log(req.user, { username });
   body.username = username;
   const result = await UserService.updateProfile(body);
 
@@ -88,10 +86,50 @@ const getPresence = catchAsync(async (req, res) => {
   sendResponse(res, { statusCode: 200, success: true, data: result });
 });
 
+const updateNotificationSettings = catchAsync(async (req, res) => {
+  const { id } = req.user;
+  const result = await UserService.updateNotificationSettings(id, req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Notification settings updated successfully",
+    data: result,
+  });
+});
+
+const deactivateAccount = catchAsync(async (req, res) => {
+  const { id } = req.user;
+  const result = await UserService.deactivateAccount(id);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Account deactivated successfully",
+    data: result,
+  });
+});
+
+const deleteAccount = catchAsync(async (req, res) => {
+  const { id } = req.user;
+  await UserService.deleteAccount(id, req.body.password);
+
+  res.clearCookie("refresh-token");
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Account deleted successfully",
+    data: null,
+  });
+});
+
 export const UserController = {
   getUserProfile,
   updateProfile,
   updateProfileAvatar,
   updateProfileBanner,
   getPresence,
+  updateNotificationSettings,
+  deactivateAccount,
+  deleteAccount,
 };

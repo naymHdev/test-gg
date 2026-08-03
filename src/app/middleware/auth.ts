@@ -24,12 +24,16 @@ const auth = (...allowedRoles: Role[]) => {
         email: true,
       },
     });
-    // console.log("user____", user);
 
     if (!user) {
       throw new AppError(httpStatus.UNAUTHORIZED, "User no longer exists");
     }
-    if (user.status === "Banned" || user.status === "Suspended") {
+    if (
+      user.status === "Banned" ||
+      user.status === "Suspended" ||
+      user.status === "Deactivated" ||
+      user.status === "Deleted"
+    ) {
       throw new AppError(httpStatus.FORBIDDEN, "Account is not active");
     }
     if (allowedRoles.length && !allowedRoles.includes(user.role)) {

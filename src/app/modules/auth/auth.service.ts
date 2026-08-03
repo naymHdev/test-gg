@@ -7,9 +7,14 @@ import { prisma } from "../../../shared/prisma";
 import { redis } from "../../../shared/redis";
 import { otpService } from "../otp/otp.service";
 import { authUtils } from "./auth.utils";
-import { sendResetPasswordEmail } from "../../utils/mailSender";
+import {
+  sendResetPasswordEmail,
+  sendPasswordChangedEmail,
+  sendTwoFactorToggledEmail,
+} from "../../utils/mailSender";
 import { TLoginInput, TRegisterInput } from "./auth.interface";
 import { TDeviceMeta } from "../../helpers/deviceMeta";
+import { paginate, PaginationQuery } from "../../helpers/paginate";
 
 const pendingRegKey = (email: string) => `pending_registration:${email}`;
 const resetTokenKey = (token: string) => `reset_token:${token}`;
@@ -35,14 +40,11 @@ const registerIntoDB = async (payload: TRegisterInput) => {
     config.jwt.bcrypt_salt_rounds,
   );
 
-  // Stash the not-yet-persisted account in Redis until OTP is confirmed —
-  // avoids creating a half-verified User row (mirrors the seedAdmin-style
-  // "don't write to DB until state is final" habit).
   await redis.set(
     pendingRegKey(payload.email),
     JSON.stringify({ ...payload, passwordHash }),
     "EX",
-    900, // 15 min, matches pendingToken TTL
+    900,
   );
 
   await otpService.sendOtp(payload.email);
@@ -93,7 +95,10 @@ const verifyRegisterOtp = async (
 };
 
 // ------------------------------------------------------------------- Login
-const loginWithCredentials = async (payload: TLoginInput) => {
+const loginWithCredentials = async (
+  payload: TLoginInput,
+  deviceMeta: TDeviceMeta,
+) => {
   const user = await prisma.user.findUnique({
     where: { email: payload.email },
   });
@@ -107,6 +112,9 @@ const loginWithCredentials = async (payload: TLoginInput) => {
   if (user.status === "Suspended") {
     throw new AppError(httpStatus.FORBIDDEN, "AUTH_ACCOUNT_SUSPENDED");
   }
+  if (user.status === "Deleted") {
+    throw new AppError(httpStatus.FORBIDDEN, "AUTH_ACCOUNT_DELETED");
+  }
 
   const passwordMatches = await bcrypt.compare(
     payload.password,
@@ -116,10 +124,36 @@ const loginWithCredentials = async (payload: TLoginInput) => {
     throw new AppError(httpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS");
   }
 
+  // "Deactivate Account" is meant to be temporary — logging back in with the
+  // correct credentials is treated as the reactivation action, same idea as
+  // most consumer apps (no separate "reactivate" endpoint needed)
+  if (user.status === "Deactivated") {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { status: "Active" },
+    });
+  }
+
+  // Login already requires an emailed OTP by default; twoFactorEnabled just
+  // controls whether that step can be skipped once credentials are verified
+  if (!user.twoFactorEnabled) {
+    const tokens = await issueTokenPair(
+      user.id,
+      user.role,
+      !!payload.stayLoggedIn,
+      deviceMeta,
+    );
+    return { twoFactorRequired: false as const, ...tokens };
+  }
+
   await otpService.sendOtp(user.email);
   const pendingToken = authUtils.signPendingToken({ email: user.email });
 
-  return { pendingToken, stayLoggedIn: !!payload.stayLoggedIn };
+  return {
+    twoFactorRequired: true as const,
+    pendingToken,
+    stayLoggedIn: !!payload.stayLoggedIn,
+  };
 };
 
 // -------------------------------------------------------- Verify Login OTP
@@ -149,7 +183,6 @@ const issueTokenPair = async (
     stayLoggedIn,
   );
 
-  // one row per device/login — this IS the "active sessions" list (see getActiveSessions below)
   await prisma.refreshToken.create({
     data: {
       userId,
@@ -164,11 +197,26 @@ const issueTokenPair = async (
     },
   });
 
-  // bump user.lastActiveAt + lastLoginIp snapshot on the User row itself,
-  // useful for admin panel "last seen from" without joining refresh_tokens
   await prisma.user.update({
     where: { id: userId },
     data: { lastActiveAt: new Date() },
+  });
+
+  // reuse ActivityLog (actorId = the user themselves) as the "Login History"
+  // list instead of adding a dedicated table — same row shape admin actions
+  // already use, just self-targeted
+  await prisma.activityLog.create({
+    data: {
+      actorId: userId,
+      action: "login",
+      targetType: "User",
+      targetId: userId,
+      metadata: {
+        ipAddress: deviceMeta.ipAddress,
+        deviceName: deviceMeta.deviceName,
+        deviceType: deviceMeta.deviceType,
+      },
+    },
   });
 
   return { accessToken, refreshToken };
@@ -183,8 +231,6 @@ const refreshAccessToken = async (token: string, deviceMeta: TDeviceMeta) => {
 
   const decoded = authUtils.verifyRefreshToken(token);
 
-  // rotate: revoke old row, issue a new one carrying the same device identity forward
-  // (IP can shift slightly on mobile networks — we just re-capture the latest one)
   await prisma.refreshToken.update({
     where: { token },
     data: { revokedAt: new Date() },
@@ -194,7 +240,6 @@ const refreshAccessToken = async (token: string, deviceMeta: TDeviceMeta) => {
 };
 
 // ------------------------------------------------------- Active sessions list
-// GET /api/auth/sessions — "which devices am I logged in on"
 const getActiveSessions = async (userId: string) => {
   return prisma.refreshToken.findMany({
     where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
@@ -210,7 +255,6 @@ const getActiveSessions = async (userId: string) => {
   });
 };
 
-// DELETE /api/auth/sessions/:id — force-logout one specific device
 const revokeSession = async (userId: string, sessionId: string) => {
   const session = await prisma.refreshToken.findUniqueOrThrow({
     where: { id: sessionId },
@@ -237,7 +281,7 @@ const logout = async (token: string) => {
 // ---------------------------------------------------------- Forgot / Reset
 const forgotPassword = async (email: string) => {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return; // don't leak account existence
+  if (!user) return;
 
   const token = uuidv4();
   await redis.set(
@@ -265,7 +309,6 @@ const resetPassword = async (token: string, newPassword: string) => {
 
   await prisma.$transaction([
     prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
-    // invalidate all sessions on password change
     prisma.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
@@ -273,6 +316,62 @@ const resetPassword = async (token: string, newPassword: string) => {
   ]);
 
   await redis.del(resetTokenKey(token));
+};
+
+// ------------------------------------------------------ Change password
+const changePassword = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+) => {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+
+  const passwordMatches = await bcrypt.compare(
+    currentPassword,
+    user.passwordHash,
+  );
+  if (!passwordMatches) {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      "Current password is incorrect",
+    );
+  }
+
+  const passwordHash = await bcrypt.hash(
+    newPassword,
+    config.jwt.bcrypt_salt_rounds,
+  );
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+    prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
+
+  sendPasswordChangedEmail(user.email).catch(() => null);
+};
+
+// ------------------------------------------------------ Two-factor toggle
+const toggleTwoFactor = async (userId: string, enabled: boolean) => {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { twoFactorEnabled: enabled },
+  });
+
+  sendTwoFactorToggledEmail(user.email, enabled).catch(() => null);
+  return { twoFactorEnabled: user.twoFactorEnabled };
+};
+
+// ------------------------------------------------------- Login history
+const getLoginHistory = async (userId: string, options: PaginationQuery) => {
+  return paginate({
+    model: prisma.activityLog,
+    where: { actorId: userId, action: "login" },
+    pagination: options,
+    defaults: { sortBy: "createdAt", sortOrder: "desc" },
+  });
 };
 
 export const authService = {
@@ -286,4 +385,7 @@ export const authService = {
   resetPassword,
   getActiveSessions,
   revokeSession,
+  changePassword,
+  toggleTwoFactor,
+  getLoginHistory,
 };

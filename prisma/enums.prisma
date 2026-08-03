@@ -12,6 +12,8 @@ enum AccountStatus {
     Warned
     Suspended
     Banned
+    Deactivated
+    Deleted
 }
 
 enum Region {
