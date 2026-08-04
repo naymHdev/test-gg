@@ -81,6 +81,10 @@ const getStream = {
   get_stream_token_expiry_seconds: process.env.GETSTREAM_TOKEN_EXPIRY_SECONDS,
 };
 
+const riot = {
+  api_key: process.env.RIOT_API_KEY,
+};
+
 export default {
   node_env: process.env.NODE_ENV,
   port: process.env.PORT || 5000,
@@ -101,4 +105,5 @@ export default {
   firebase,
   rateLimits,
   getStream,
+  riot,
 };

@@ -53,6 +53,11 @@ export const rateLimiter = {
     "Upload limit reached, try again later.",
   ),
   global: createRateLimiter(60 * 1000, 100),
+  riotVerify: createRateLimiter(
+    60 * 1000,
+    5,
+    "Too many Riot verification attempts, try again in a minute.",
+  ),
 };
 
 export default createRateLimiter;

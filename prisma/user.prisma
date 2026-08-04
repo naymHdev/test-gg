@@ -13,6 +13,8 @@ model User {
     isPremium        Boolean @default(false)
     isRiotVerified   Boolean @default(false)
     riotAccount      Json?
+    riotPuuid        String? @unique
+
     stripeCustomerId String? @unique
 
     twoFactorEnabled          Boolean @default(true)
