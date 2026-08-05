@@ -26,8 +26,60 @@ const getUserProfileFromDB = async (username: string) => {
   return result;
 };
 
-const updateProfile = async (payload: any) => {
-  console.log("payload____", payload);
+const USER_FIELDS = ["username", "uiLanguage"] as const;
+const PROFILE_FIELDS = [
+  "bio",
+  "background",
+  "borderStyle",
+  "nameColor",
+] as const;
+
+const updateProfile = async (
+  userId: string,
+  payload: {
+    username?: string;
+    uiLanguage?: string;
+    bio?: string;
+    background?: string;
+    borderStyle?: string;
+    nameColor?: string;
+  },
+) => {
+  const userData: Record<string, unknown> = {};
+  const profileData: Record<string, unknown> = {};
+
+  for (const key of USER_FIELDS) {
+    if (payload[key] !== undefined) userData[key] = payload[key];
+  }
+  for (const key of PROFILE_FIELDS) {
+    if (payload[key] !== undefined) profileData[key] = payload[key];
+  }
+
+  if (typeof userData.username === "string") {
+    const taken = await prisma.user.findFirst({
+      where: {
+        username: { equals: userData.username as string, mode: "insensitive" },
+        id: { not: userId },
+      },
+    });
+    if (taken) {
+      throw new AppError(httpStatus.CONFLICT, "USERNAME_TAKEN");
+    }
+  }
+
+  const [updatedUser, updatedProfile] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: userData,
+      select: { id: true, username: true, uiLanguage: true },
+    }),
+    prisma.profile.update({
+      where: { userId },
+      data: profileData,
+    }),
+  ]);
+
+  return { ...updatedUser, profile: updatedProfile };
 };
 
 const updateProfileAvatar = async (payload: {

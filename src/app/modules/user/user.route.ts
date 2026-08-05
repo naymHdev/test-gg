@@ -13,6 +13,7 @@ router.get("/:username/profile", UserController.getUserProfile);
 router.patch(
   "/profile",
   auth(Role.Admin, Role.Moderator, Role.Owner, Role.User),
+  validateRequest(userValidation.updateProfileValidation),
   UserController.updateProfile,
 );
 

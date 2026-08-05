@@ -96,6 +96,15 @@ const onConnection = async (socket: AuthedSocket) => {
     io.to(`user:${senderId}`).emit("message:read", { by: userId });
   });
 
+  socket.on("conversation:open", ({ withUserId }: { withUserId: string }) => {
+    if (!withUserId) return;
+    redis.set(`active_convo:${userId}`, withUserId, "EX", 60 * 30); // 30 min safety TTL
+  });
+
+  socket.on("conversation:close", () => {
+    redis.del(`active_convo:${userId}`);
+  });
+
   // ---- Voice channel real-time room ----
   // Client calls this right after a successful /join REST call (once it has
   // a streamToken) so it starts receiving channel-scoped broadcasts
@@ -125,6 +134,7 @@ const onConnection = async (socket: AuthedSocket) => {
 
     if (sockets.size === 0) {
       userSockets.delete(userId);
+      await redis.del(`active_convo:${userId}`);
       await redis.set(
         `presence:${userId}`,
         "offline",

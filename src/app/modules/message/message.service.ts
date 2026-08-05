@@ -7,6 +7,7 @@ import { SendMessageInput } from "./message.validation";
 import { notificationHelper } from "../notification/notification.helper";
 import { assertCanInteract } from "../friend/friend.service";
 import { emitToUser } from "../../../socket/socket";
+import { redis } from "../../../shared/redis";
 
 // ─── Conversation ────────────────────────────────────────────────────────────
 
@@ -68,28 +69,39 @@ const sendMessageIntoDB = async (
 
   const preview = content.length > 80 ? `${content.slice(0, 80)}…` : content;
 
+  // receiver already looking at this exact conversation? then the live
+  // socket emit below is enough — a notification+push for a message
+  // they're already reading is just noise
+  const activeWith = await redis.get(`active_convo:${receiverId}`);
+  const receiverIsViewingThisChat = activeWith === senderId;
+
   const message = await prisma.$transaction(async (tx) => {
     const created = await tx.message.create({
       data: { senderId, receiverId, content },
     });
 
-    await notificationHelper.createNotification(tx, {
-      userId: receiverId,
-      type: NotificationType.message_new,
-      title: "New message",
-      body: preview,
-      data: { messageId: created.id, fromUserId: senderId },
-    });
+    if (!receiverIsViewingThisChat) {
+      await notificationHelper.createNotification(tx, {
+        userId: receiverId,
+        type: NotificationType.message_new,
+        title: "New message",
+        body: preview,
+        data: { messageId: created.id, fromUserId: senderId },
+      });
+    }
 
     return created;
   });
 
-  notificationHelper.queuePush(receiverId, {
-    title: "New message",
-    body: preview,
-  });
+  if (!receiverIsViewingThisChat) {
+    notificationHelper.queuePush(receiverId, {
+      title: "New message",
+      body: preview,
+    });
+  }
 
-  // If socket.io not installed yet — emit "message:new" to receiverId's
+  // socket emit always happens — receiver's client needs this to render
+  // the message live, regardless of notification/push suppression above
   emitToUser(receiverId, "message:new", message);
 
   return message;
