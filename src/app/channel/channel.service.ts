@@ -45,6 +45,9 @@ const createChannel = async (
       created_by_id: ownerId,
       members: [{ user_id: ownerId, role: "admin" }],
       custom: { name: payload.name, visibility: payload.visibility },
+      settings_override: {
+        backstage: { enabled: false },
+      },
     },
   });
 
