@@ -1,0 +1,29 @@
+# Dependencies — Docker নিজেই install করবে
+node_modules
+.pnp
+.pnp.js
+
+# Next.js build output
+.next
+out
+
+# Environment files — কখনো image এ রাখবে না
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode
+.idea

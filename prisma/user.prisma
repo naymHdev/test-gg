@@ -10,10 +10,10 @@ model User {
     accountLanguage Language // immutable after registration
     uiLanguage      Language @default(en)
 
-    isPremium        Boolean @default(false)
-    isRiotVerified   Boolean @default(false)
-    riotAccount      Json?
-    riotPuuid        String? @unique
+    isPremium      Boolean @default(false)
+    isRiotVerified Boolean @default(false)
+    riotAccount    Json?
+    riotPuuid      String? @unique
 
     stripeCustomerId String? @unique
 
@@ -93,6 +93,9 @@ model User {
     voiceChannelBans     VoiceChannelBan[]     @relation("VoiceChannelBannedUser")
     waitingRoomRequests  WaitingRoomRequest[]  @relation("VoiceChannelWaitingUser")
     channelMessages      ChannelMessage[]      @relation("ChannelMessageSender")
+    reviewedWithdrawals  WithdrawalRequest[]   @relation("WithdrawalReviewer")
+    paymentMethods       PaymentMethod[]
+    withdrawalRequests   WithdrawalRequest[]
 
     @@index([region, accountLanguage])
     @@map("users")

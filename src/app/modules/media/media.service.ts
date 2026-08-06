@@ -63,6 +63,7 @@ const getAllMedia = async (query: Record<string, unknown>) => {
     include: {
       user: { select: userCard },
       images: true,
+      mediaVideos: true,
       reactions: { select: { type: true } },
     },
   });
@@ -91,6 +92,7 @@ const getSingleMedia = async (id: string) => {
     where: { id, deletedAt: null },
     include: {
       images: { orderBy: { order: "asc" } },
+      mediaVideos: { orderBy: { order: "asc" } },
       user: { select: userCard },
       reactions: { select: { type: true } },
       _count: { select: { comments: true } },

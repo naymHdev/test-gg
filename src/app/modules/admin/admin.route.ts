@@ -28,6 +28,8 @@ import {
 } from "../subscription/subscription.validation";
 import { broadcastNotificationValidation } from "../notification/notification.validation";
 import { notificationController } from "../notification/notification.controller";
+import { walletController } from "../wallet/wallet.controller";
+import { walletValidation } from "../wallet/wallet.validation";
 
 const router = Router();
 
@@ -227,6 +229,32 @@ router.post(
   auth(Role.Moderator, Role.Admin, Role.Owner),
   validateRequest(broadcastNotificationValidation),
   notificationController.broadcastNotification,
+);
+
+// ─── Wallet withdrawals (manage_wallet) ─────────────────────────────────────
+router.get(
+  "/wallet/withdrawals",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  walletController.adminGetAllWithdrawals,
+);
+
+router.patch(
+  "/wallet/withdrawals/:id/approve",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  walletController.adminApproveWithdrawal,
+);
+
+router.patch(
+  "/wallet/withdrawals/:id/reject",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(walletValidation.withdrawalRejectValidation),
+  walletController.adminRejectWithdrawal,
+);
+
+router.patch(
+  "/wallet/withdrawals/:id/complete",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  walletController.adminCompleteWithdrawal,
 );
 
 export const adminRoutes = router;

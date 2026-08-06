@@ -71,6 +71,7 @@ enum Permission {
     manage_tournaments
     manage_challenges
     manage_settings
+    manage_wallet
 }
 
 // ===================== POSTS / MEDIA =====================
@@ -195,6 +196,33 @@ enum BillingInterval {
 enum TransactionType {
     Credit
     Debit
+}
+
+enum TransactionCategory {
+    Deposit
+    Withdrawal
+    TournamentPrize
+    ChallengeReward
+    ManualAdjustment
+    Refund
+}
+
+enum WithdrawalMethod {
+    PayPal
+    BankTransfer
+}
+
+enum WithdrawalStatus {
+    Pending
+    Approved
+    Rejected
+    Completed
+}
+
+enum PaymentMethodKind {
+    Card
+    PayPal
+    BankAccount
 }
 
 // ===================== NOTIFICATIONS =====================

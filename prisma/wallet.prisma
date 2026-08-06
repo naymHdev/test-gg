@@ -1,30 +1,92 @@
 model Wallet {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  balance     Decimal  @default(0) @db.Decimal(10, 2)
-  currency    String   @default("EUR") @db.VarChar(3)
+  balance        Decimal @default(0) @db.Decimal(10, 2)
+  // held for pending withdrawal requests — subtracted from "available" in the
+  // UI (Available Balance = balance - pendingBalance) without touching the
+  // real balance until the withdrawal is actually approved/rejected
+  pendingBalance Decimal @default(0) @db.Decimal(10, 2)
+  currency       String  @default("EUR") @db.VarChar(3)
 
-  updatedAt   DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
-  transactions WalletTransaction[]
+  transactions       WalletTransaction[]
+  withdrawalRequests WithdrawalRequest[]
 
   @@map("wallets")
 }
 
 model WalletTransaction {
-  id          String          @id @default(cuid())
-  walletId    String
-  wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
-  type        TransactionType
-  amount      Decimal         @db.Decimal(10, 2)
-  reason      String          @db.VarChar(200)
-  referenceId String?                              // tournamentId, rewardId, etc.
+  type        TransactionType // Credit | Debit — direction
+  category    TransactionCategory // Deposit | Withdrawal | TournamentPrize | ...
+  amount      Decimal             @db.Decimal(10, 2)
+  reason      String              @db.VarChar(200)
+  referenceId String? // tournamentId, withdrawalRequestId, stripe session id, etc.
 
-  createdAt   DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@index([walletId])
+  @@index([walletId, category])
   @@map("wallet_transactions")
+}
+
+model WithdrawalRequest {
+  id       String @id @default(cuid())
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount         Decimal          @db.Decimal(10, 2)
+  method         WithdrawalMethod
+  paymentDetails Json // { email } for PayPal, { iban, accountHolderName } for bank
+
+  status          WithdrawalStatus @default(Pending)
+  rejectionReason String?          @db.VarChar(300)
+
+  reviewedById String?
+  reviewedBy   User?     @relation("WithdrawalReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([status])
+  @@map("withdrawal_requests")
+}
+
+model PaymentMethod {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind PaymentMethodKind
+
+  // Card (Stripe-backed — the real card data lives with Stripe, we only
+  // keep the reference + display fields)
+  stripePaymentMethodId String?
+  last4                 String? @db.VarChar(4)
+  expiryMonth           Int?
+  expiryYear            Int?
+
+  // PayPal
+  paypalEmail String?
+
+  // Bank transfer (withdrawal destination)
+  iban              String?
+  accountHolderName String?
+
+  isDefault Boolean @default(false)
+  verified  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("payment_methods")
 }
