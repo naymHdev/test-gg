@@ -257,4 +257,23 @@ router.patch(
   walletController.adminCompleteWithdrawal,
 );
 
+router.get(
+  "/wallet/transactions",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  walletController.adminGetAllTransactions,
+);
+
+router.get(
+  "/wallet/users/:userId/transactions",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  walletController.adminGetUserTransactions,
+);
+
+router.post(
+  "/wallet/users/:userId/adjust",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  validateRequest(walletValidation.adjustBalanceValidation),
+  walletController.adminAdjustBalance,
+);
+
 export const adminRoutes = router;

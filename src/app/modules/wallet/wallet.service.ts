@@ -1,9 +1,11 @@
 import Stripe from "stripe";
 import httpStatus from "http-status";
 import { prisma } from "../../../shared/prisma";
+import { redis } from "../../../shared/redis";
 import QueryBuilder from "../../builder/QueryBuilder";
 import { userSelect } from "../../helpers/select";
 import { stripe } from "../../../lib/stripe/stripe.client";
+import * as paypalClient from "../../../lib/paypal/client";
 import config from "../../config";
 import AppError from "../../error/AppError";
 import { walletHelper } from "./wallet.helper";
@@ -135,6 +137,92 @@ const handleDepositCheckoutCompleted = async (
       body: `€${amount.toFixed(2)} has been added to your wallet`,
     })
     .catch(() => null);
+};
+
+// ─── Deposit (PayPal) ───────────────────────────────────────────────────────
+// Orders API v2: create order server-side with a fixed amount → frontend
+// renders PayPal's approval button using the returned orderId → user
+// approves on PayPal → frontend calls our capture endpoint with the same
+// orderId → we capture server-to-server and credit the wallet from
+// PayPal's own captured amount, never from anything the client sent.
+
+const paypalDepositOrderKey = (orderId: string) =>
+  `paypal_deposit_order:${orderId}`;
+const PAYPAL_ORDER_TTL_SECONDS = 60 * 60 * 3; // matches PayPal's own ~3h order expiry
+
+const createPaypalDepositOrder = async (userId: string, amount: number) => {
+  const order = await paypalClient.createOrder(amount, userId);
+
+  // binds this orderId to this specific user so capture can't be called
+  // with an orderId that belongs to someone else's deposit
+  await redis.set(
+    paypalDepositOrderKey(order.id),
+    userId,
+    "EX",
+    PAYPAL_ORDER_TTL_SECONDS,
+  );
+
+  return { orderId: order.id };
+};
+
+const capturePaypalDeposit = async (userId: string, orderId: string) => {
+  const boundUserId = await redis.get(paypalDepositOrderKey(orderId));
+  if (boundUserId !== userId) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "This PayPal order does not belong to you",
+    );
+  }
+
+  // idempotency — a retried/duplicate capture call must not double-credit
+  const alreadyProcessed = await prisma.walletTransaction.findFirst({
+    where: { referenceId: orderId, category: TransactionCategory.Deposit },
+  });
+  if (alreadyProcessed) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "This deposit has already been processed",
+    );
+  }
+
+  const captured = await paypalClient.captureOrder(orderId);
+
+  if (captured.status !== "COMPLETED") {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "PayPal payment was not completed",
+    );
+  }
+
+  // this is PayPal's own record of what was actually captured — the only
+  // amount we ever trust for crediting
+  const amount = Number(
+    captured.purchase_units[0]?.payments.captures[0]?.amount.value ?? 0,
+  );
+  if (amount <= 0) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Invalid captured amount");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await walletHelper.creditWallet(tx, {
+      userId,
+      amount,
+      category: TransactionCategory.Deposit,
+      reason: "Wallet deposit via PayPal",
+      referenceId: orderId,
+    });
+  });
+
+  await redis.del(paypalDepositOrderKey(orderId));
+
+  notificationHelper
+    .queuePush(userId, {
+      title: "Wallet credited",
+      body: `€${amount.toFixed(2)} has been added to your wallet`,
+    })
+    .catch(() => null);
+
+  return { amount };
 };
 
 // ─── Withdrawal (user) ──────────────────────────────────────────────────────
@@ -315,15 +403,95 @@ const adminCompleteWithdrawal = async (
   return updated;
 };
 
+// ─── Transaction visibility (admin) ─────────────────────────────────────────
+// One shared function backs "all deposits", "all transactions of any
+// category", and "one user's full history" — they're the same query with a
+// different `where`, so a single generic listing avoids three near-copies
+// that would drift out of sync over time.
+
+const adminGetAllTransactions = async (query: Record<string, any>) => {
+  const queryBuilder = new QueryBuilder(query)
+    .search(["type", "category", "reason"])
+    .filter()
+    .sort()
+    .paginate();
+
+  const options = queryBuilder.build();
+
+  const transactions = await prisma.walletTransaction.findMany({
+    ...options,
+    include: { wallet: { include: { user: { select: userSelect } } } },
+  });
+  const meta = await queryBuilder.countTotal(prisma.walletTransaction);
+  return { transactions, meta };
+};
+
+const adminGetUserTransactions = async (
+  userId: string,
+  query: Record<string, any>,
+) => {
+  const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId } });
+
+  const queryBuilder = new QueryBuilder(query)
+    .search(["type", "category", "reason"])
+    .filter()
+    .sort()
+    .paginate();
+
+  const options = queryBuilder.build();
+
+  const transactions = await prisma.walletTransaction.findMany({
+    ...options,
+    where: { ...options.where, walletId: wallet.id },
+  });
+  const meta = await queryBuilder.countTotal(prisma.walletTransaction);
+  return { wallet, transactions, meta };
+};
+
+// ─── Manual balance adjustment (admin) ──────────────────────────────────────
+
+const adminAdjustBalance = async (
+  targetUserId: string,
+  adminId: string,
+  payload: { direction: "Credit" | "Debit"; amount: number; reason: string },
+) => {
+  const updated = await prisma.$transaction(async (tx) => {
+    if (payload.direction === "Credit") {
+      return walletHelper.creditWallet(tx, {
+        userId: targetUserId,
+        amount: payload.amount,
+        category: TransactionCategory.ManualAdjustment,
+        reason: payload.reason,
+        referenceId: adminId,
+      });
+    }
+
+    return walletHelper.debitWallet(tx, {
+      userId: targetUserId,
+      amount: payload.amount,
+      category: TransactionCategory.ManualAdjustment,
+      reason: payload.reason,
+      referenceId: adminId,
+    });
+  });
+
+  return updated;
+};
+
 export const walletService = {
   myWallet,
   myTransactions,
   createDepositCheckoutSession,
   handleDepositCheckoutCompleted,
+  createPaypalDepositOrder,
+  capturePaypalDeposit,
   requestWithdrawal,
   myWithdrawals,
   adminGetAllWithdrawals,
   adminApproveWithdrawal,
   adminRejectWithdrawal,
   adminCompleteWithdrawal,
+  adminGetAllTransactions,
+  adminGetUserTransactions,
+  adminAdjustBalance,
 };

@@ -7,6 +7,10 @@ const depositValidation = z.object({
     .max(10000, "Maximum deposit is €10,000 per transaction"),
 });
 
+const paypalCaptureValidation = z.object({
+  orderId: z.string({ message: "orderId is required" }),
+});
+
 const withdrawalRequestValidation = z
   .object({
     amount: z
@@ -52,8 +56,20 @@ const withdrawalRejectValidation = z.object({
   reason: z.string().min(5, "A rejection reason is required"),
 });
 
+const adjustBalanceValidation = z.object({
+  direction: z.enum(["Credit", "Debit"], {
+    message: "direction must be Credit or Debit",
+  }),
+  amount: z
+    .number({ message: "Amount is required" })
+    .positive("Amount must be greater than 0"),
+  reason: z.string().min(5, "A reason is required for manual adjustments"),
+});
+
 export const walletValidation = {
   depositValidation,
+  paypalCaptureValidation,
   withdrawalRequestValidation,
   withdrawalRejectValidation,
+  adjustBalanceValidation,
 };

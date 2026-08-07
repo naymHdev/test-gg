@@ -85,6 +85,12 @@ const riot = {
   api_key: process.env.RIOT_API_KEY,
 };
 
+const paypal = {
+  client_id: process.env.PAYPAL_CLIENT_ID,
+  client_secret: process.env.PAYPAL_CLIENT_SECRET,
+  mode: process.env.PAYPAL_MODE || "sandbox", // "sandbox" or "live"
+};
+
 export default {
   node_env: process.env.NODE_ENV,
   port: process.env.PORT || 5000,
@@ -106,4 +112,5 @@ export default {
   rateLimits,
   getStream,
   riot,
+  paypal,
 };

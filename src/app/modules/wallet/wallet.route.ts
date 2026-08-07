@@ -26,6 +26,19 @@ router.post(
 );
 
 router.post(
+  "/deposit/paypal/create",
+  auth(Role.User, Role.Admin, Role.Owner, Role.Moderator),
+  validateRequest(walletValidation.depositValidation),
+  walletController.paypalDepositCreate,
+);
+router.post(
+  "/deposit/paypal/capture",
+  auth(Role.User, Role.Admin, Role.Owner, Role.Moderator),
+  validateRequest(walletValidation.paypalCaptureValidation),
+  walletController.paypalDepositCapture,
+);
+
+router.post(
   "/withdrawals",
   auth(Role.User, Role.Admin, Role.Owner, Role.Moderator),
   validateRequest(walletValidation.withdrawalRequestValidation),
