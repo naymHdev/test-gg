@@ -69,6 +69,34 @@ const depositCheckout = catchAsync(async (req, res) => {
   });
 });
 
+const paypalDepositCreate = catchAsync(async (req, res) => {
+  const { id } = req.user;
+  const { amount } = req.body;
+
+  const result = await walletService.createPaypalDepositOrder(id, amount);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "PayPal order created",
+    data: result,
+  });
+});
+
+const paypalDepositCapture = catchAsync(async (req, res) => {
+  const { id } = req.user;
+  const { orderId } = req.body;
+
+  const result = await walletService.capturePaypalDeposit(id, orderId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Wallet credited",
+    data: result,
+  });
+});
+
 const requestWithdrawal = catchAsync(async (req, res) => {
   const { id } = req.user;
   const result = await walletService.requestWithdrawal(id, req.body);
@@ -164,14 +192,73 @@ const adminCompleteWithdrawal = catchAsync(async (req, res) => {
   });
 });
 
+const adminGetAllTransactions = catchAsync(async (req, res) => {
+  await assertManageWalletAccess(req.user);
+
+  // frontend's "View all deposits" tab is just this endpoint with
+  // ?category=Deposit — QueryBuilder's .filter() already passes arbitrary
+  // query params straight into Prisma's `where`, so no separate endpoint
+  // is needed for that view
+  const { transactions, meta } = await walletService.adminGetAllTransactions(
+    req.query,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Transactions retrieved",
+    meta,
+    data: transactions,
+  });
+});
+
+const adminGetUserTransactions = catchAsync(async (req, res) => {
+  await assertManageWalletAccess(req.user);
+
+  const result = await walletService.adminGetUserTransactions(
+    req.params.userId as string,
+    req.query,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User transactions retrieved",
+    meta: result.meta,
+    data: { wallet: result.wallet, transactions: result.transactions },
+  });
+});
+
+const adminAdjustBalance = catchAsync(async (req, res) => {
+  await assertManageWalletAccess(req.user);
+
+  const result = await walletService.adminAdjustBalance(
+    req.params.userId as string,
+    req.user.id as string,
+    req.body,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Wallet balance adjusted",
+    data: result,
+  });
+});
+
 export const walletController = {
   myWallet,
   myTransactions,
   depositCheckout,
+  paypalDepositCreate,
+  paypalDepositCapture,
   requestWithdrawal,
   myWithdrawals,
   adminGetAllWithdrawals,
   adminApproveWithdrawal,
   adminRejectWithdrawal,
   adminCompleteWithdrawal,
+  adminGetAllTransactions,
+  adminGetUserTransactions,
+  adminAdjustBalance,
 };
