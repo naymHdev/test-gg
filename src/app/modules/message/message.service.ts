@@ -52,7 +52,7 @@ const sendMessageIntoDB = async (
   senderId: string,
   payload: SendMessageInput,
 ) => {
-  const { receiverId, content } = payload;
+  const { receiverId, content, imageUrl } = payload;
 
   if (receiverId === senderId) {
     throw new AppError(httpStatus.BAD_REQUEST, "You cannot message yourself");
@@ -67,17 +67,18 @@ const sendMessageIntoDB = async (
 
   await assertCanInteract(senderId, receiverId);
 
-  const preview = content.length > 80 ? `${content.slice(0, 80)}…` : content;
+  const preview = content
+    ? content.length > 80
+      ? `${content.slice(0, 80)}…`
+      : content
+    : "📷 Photo";
 
-  // receiver already looking at this exact conversation? then the live
-  // socket emit below is enough — a notification+push for a message
-  // they're already reading is just noise
   const activeWith = await redis.get(`active_convo:${receiverId}`);
   const receiverIsViewingThisChat = activeWith === senderId;
 
   const message = await prisma.$transaction(async (tx) => {
     const created = await tx.message.create({
-      data: { senderId, receiverId, content },
+      data: { senderId, receiverId, content, imageUrl },
     });
 
     if (!receiverIsViewingThisChat) {

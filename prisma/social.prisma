@@ -28,8 +28,9 @@ model Message {
   receiverId String
   receiver   User   @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
-  content String  @db.VarChar(2000)
-  read    Boolean @default(false)
+  content  String  @db.VarChar(2000)
+  imageUrl String?
+  read     Boolean @default(false)
 
   createdAt DateTime @default(now())
 

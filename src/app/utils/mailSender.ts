@@ -6,7 +6,8 @@ import config from "../config";
 const transporter = nodemailer.createTransport({
   host: config.nodemailer.host,
   port: Number(config.nodemailer.port),
-  secure: Boolean(config.nodemailer.secure),
+  secure: config.nodemailer.secure === "true",
+  // requireTLS: true,
   auth: {
     user: config.nodemailer.auth.user,
     pass: config.nodemailer.auth.pass,

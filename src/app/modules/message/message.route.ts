@@ -8,6 +8,8 @@ import {
   sendMessageValidation,
   markMessagesReadValidation,
 } from "./message.validation";
+import { uploadFactory } from "../../helpers/uploadFactory";
+import parseData from "../../middleware/parseData";
 
 const router = Router();
 const anyAuthedUser = [
@@ -27,6 +29,10 @@ router.post(
   "/",
   auth(...anyAuthedUser),
   rateLimiter.sendMessage,
+  uploadFactory({ type: "image", maxFiles: 1, maxFileSizeMB: 10 }).single(
+    "image",
+  ),
+  parseData(),
   validateRequest(sendMessageValidation),
   messageController.sendMessage,
 );
