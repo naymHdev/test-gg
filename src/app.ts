@@ -13,48 +13,59 @@ dotenv.config();
 
 const app: Express = express();
 
-// Required behind nginx/any reverse proxy (Hetzner setup) — without this,
-// req.ip / x-forwarded-for based rate limiting sees nginx's IP, not the client's.
 app.set("trust proxy", 1);
 
-app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
-
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:3002",
-  "http://localhost:3003",
-
-  "https://finderq.gg",
-  "https://www.finderq.gg",
-
-  "https://api.finderq.gg",
-
-  "https://dashboard.finderq.gg",
-  "https://www.dashboard.finderq.gg",
-];
-
 app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+  helmet.crossOriginResourcePolicy({
+    policy: "cross-origin",
   }),
 );
 
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  }),
+);
+
+// const allowedOrigins = [
+//   "http://localhost:3000",
+//   "http://localhost:3001",
+//   "http://localhost:3002",
+//   "http://localhost:3003",
+
+//   "https://finderq.gg",
+//   "https://www.finderq.gg",
+
+//   "https://api.finderq.gg",
+
+//   "https://dashboard.finderq.gg",
+//   "https://www.dashboard.finderq.gg",
+// ];
+
+// app.use(
+//   cors({
+//     origin(origin, callback) {
+//       if (!origin) {
+//         return callback(null, true);
+//       }
+
+//       if (allowedOrigins.includes(origin)) {
+//         return callback(null, true);
+//       }
+
+//       return callback(new Error(`CORS blocked for origin: ${origin}`));
+//     },
+//     credentials: true,
+//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//   }),
+// );
+
 // Stripe needs the raw request body to verify the webhook signature, so this
 // must be registered before express.json() below.
+
 app.post(
   "/api/webhooks/stripe/subscription",
   express.raw({ type: "application/json" }),
