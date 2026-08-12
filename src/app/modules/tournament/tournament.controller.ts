@@ -110,6 +110,20 @@ const getTournaments = catchAsync(async (req, res) => {
   });
 });
 
+const getTournamentPaymentTransactions = catchAsync(async (req, res) => {
+  await assertManageTournamentsAccess(req.user);
+  const { transactions, meta } =
+    await tournamentService.getTournamentPaymentTransactionsFromDB(req.query);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Tournament payment transactions retrieved successfully",
+    meta,
+    data: transactions,
+  });
+});
+
 const getTournamentById = catchAsync(async (req, res) => {
   const result = await tournamentService.getTournamentByIdFromDB(
     req.params.id as string,
@@ -217,6 +231,7 @@ const declareMatchWinner = catchAsync(async (req, res) => {
 export const tournamentController = {
   createTournament,
   getTournaments,
+  getTournamentPaymentTransactions,
   getTournamentById,
   approveTournament,
   openRegistration,

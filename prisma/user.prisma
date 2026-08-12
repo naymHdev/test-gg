@@ -53,6 +53,7 @@ model User {
 
     createdTournaments  Tournament[] @relation("TournamentCreator")
     approvedTournaments Tournament[] @relation("TournamentApprover")
+    tournamentPaymentTransactions TournamentPaymentTransaction[] @relation("TournamentPaymentCreator")
     capturedTeams       Team[]       @relation("TeamCaptain")
     teamMemberships     TeamMember[]
     declaredMatches     Match[]      @relation("MatchDeclaredBy")

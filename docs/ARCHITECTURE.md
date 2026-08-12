@@ -152,6 +152,7 @@ Legend: **A** = `auth()` role gate · **P** = `authorize()` permission · **O** 
 |---|---|---|---|
 | GET | /api/tournaments | O | filter by `status`,`region` |
 | POST | /api/tournaments | A(User+) | creates with `status: Pending` |
+| GET | /api/admin/tournament-payment-transactions | A+P(manage_tournaments) | paginated prize-pool payments with tournament and creator details |
 | 🛠 PUT | /api/admin/tournaments/:id/approve | A+P(manage_tournaments) | `Pending → RegistrationOpen`, sets `approvedById/At` |
 | 🛠 PUT | /api/admin/tournaments/:id/reject | A+P(manage_tournaments) | `→ Cancelled` |
 | POST | /api/tournaments/:id/teams | A(User+) | service enforces **one team per tournament per user** via `TeamMember` unique-lookup before create (transaction) |

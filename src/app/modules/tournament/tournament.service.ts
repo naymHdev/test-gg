@@ -226,6 +226,34 @@ const getTournamentsFromDB = async (query: Record<string, unknown>) => {
   return { tournaments, meta };
 };
 
+const getTournamentPaymentTransactionsFromDB = async (
+  query: Record<string, unknown>,
+) => {
+  const queryBuilder = new QueryBuilder(query).filter().sort().paginate();
+  const options = queryBuilder.build();
+
+  const transactions = await prisma.tournamentPaymentTransaction.findMany({
+    ...options,
+    include: {
+      creator: { select: { id: true, username: true, email: true } },
+      tournament: {
+        select: {
+          id: true,
+          name: true,
+          prizePool: true,
+          status: true,
+          startDate: true,
+        },
+      },
+    },
+  });
+  const meta = await queryBuilder.countTotal(
+    prisma.tournamentPaymentTransaction,
+  );
+
+  return { transactions, meta };
+};
+
 const getTournamentByIdFromDB = async (tournamentId: string) => {
   const tournament = await prisma.tournament.findUniqueOrThrow({
     where: { id: tournamentId },
@@ -559,6 +587,7 @@ export const tournamentService = {
   createTournamentForCreator,
   handleTournamentCheckoutCompleted,
   getTournamentsFromDB,
+  getTournamentPaymentTransactionsFromDB,
   getTournamentByIdFromDB,
   approveTournamentInDB,
   openRegistrationInDB,

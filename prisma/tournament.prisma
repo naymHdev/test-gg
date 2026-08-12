@@ -50,6 +50,7 @@ model TournamentPaymentTransaction {
   tournamentId            String     @unique
   tournament              Tournament @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
   creatorId               String
+  creator                 User       @relation("TournamentPaymentCreator", fields: [creatorId], references: [id], onDelete: Restrict)
   amount                  Decimal    @db.Decimal(10, 2)
   currency                String     @default("EUR") @db.VarChar(3)
   stripeCheckoutSessionId String     @unique

@@ -89,6 +89,12 @@ router.get(
 // ─── Moderation (manage_tournaments) ────────────────────────────────────────
 
 // ─── Tournaments ────────────────────────────
+router.get(
+  "/tournament-payment-transactions",
+  auth(Role.Moderator, Role.Admin, Role.Owner),
+  tournamentController.getTournamentPaymentTransactions,
+);
+
 router.put(
   "/tournaments/:id/approve",
   auth(Role.Moderator, Role.Admin, Role.Owner),

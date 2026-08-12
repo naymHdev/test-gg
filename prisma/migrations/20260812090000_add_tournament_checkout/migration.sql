@@ -36,3 +36,4 @@ CREATE INDEX "tournament_payment_transactions_creatorId_idx" ON "tournament_paym
 CREATE INDEX "tournament_payment_transactions_paidAt_idx" ON "tournament_payment_transactions"("paidAt");
 
 ALTER TABLE "tournament_payment_transactions" ADD CONSTRAINT "tournament_payment_transactions_tournamentId_fkey" FOREIGN KEY ("tournamentId") REFERENCES "tournaments"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "tournament_payment_transactions" ADD CONSTRAINT "tournament_payment_transactions_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
