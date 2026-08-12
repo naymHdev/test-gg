@@ -5,6 +5,7 @@ import { stripe } from "../../../lib/stripe/stripe.client";
 import config from "../../config";
 import { subscriptionService } from "./subscription.service";
 import { walletService } from "../wallet/wallet.service";
+import { tournamentService } from "../tournament/tournament.service";
 
 // Mirrors what Stripe reports — never drives renewal/cancellation itself.
 // Configure this URL (`/api/webhooks/stripe/subscription`) in the Stripe
@@ -49,6 +50,11 @@ export const handleSubscriptionWebhook = async (
         session.metadata?.purpose === "wallet_deposit"
       ) {
         await walletService.handleDepositCheckoutCompleted(session);
+      } else if (
+        session.mode === "payment" &&
+        session.metadata?.purpose === "tournament_prize_pool"
+      ) {
+        await tournamentService.handleTournamentCheckoutCompleted(session);
       }
       break;
     }

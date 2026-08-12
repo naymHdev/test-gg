@@ -81,15 +81,17 @@ const createTournament = catchAsync(async (req, res) => {
   if (uploaded.cover) body.cover = uploaded.cover;
   if (uploaded.image) body.image = uploaded.image;
 
-  const result = await tournamentService.createTournamentIntoDB(
+  const result = await tournamentService.createTournamentForCreator(
     creatorId as string,
     body,
   );
 
   sendResponse(res, {
-    statusCode: httpStatus.CREATED,
+    statusCode: result.requiresPayment ? httpStatus.OK : httpStatus.CREATED,
     success: true,
-    message: "Tournament created successfully, pending approval",
+    message: result.requiresPayment
+      ? "Complete prize pool payment to create the tournament"
+      : "Tournament created successfully, pending approval",
     data: result,
   });
 });

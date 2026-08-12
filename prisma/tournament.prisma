@@ -23,11 +23,43 @@ model Tournament {
 
   teams   Team[]
   matches Match[]
+  paymentTransaction TournamentPaymentTransaction?
 
   createdAt DateTime @default(now())
 
   @@index([status, region])
   @@map("tournaments")
+}
+
+model TournamentCheckout {
+  id                      String   @id @default(cuid())
+  creatorId               String
+  amount                  Decimal  @db.Decimal(10, 2)
+  payload                 Json
+  stripeCheckoutSessionId String?  @unique
+  tournamentId            String?  @unique
+  completedAt             DateTime?
+  createdAt               DateTime @default(now())
+
+  @@index([creatorId])
+  @@map("tournament_checkouts")
+}
+
+model TournamentPaymentTransaction {
+  id                      String     @id @default(cuid())
+  tournamentId            String     @unique
+  tournament              Tournament @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  creatorId               String
+  amount                  Decimal    @db.Decimal(10, 2)
+  currency                String     @default("EUR") @db.VarChar(3)
+  stripeCheckoutSessionId String     @unique
+  stripePaymentIntentId   String?    @unique
+  paidAt                  DateTime
+  createdAt               DateTime   @default(now())
+
+  @@index([creatorId])
+  @@index([paidAt])
+  @@map("tournament_payment_transactions")
 }
 
 model Team {

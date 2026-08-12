@@ -1,4 +1,5 @@
 import httpStatus from "http-status";
+import Stripe from "stripe";
 import AppError from "../../error/AppError";
 import { prisma } from "../../../shared/prisma";
 import QueryBuilder from "../../builder/QueryBuilder";
@@ -6,15 +7,19 @@ import {
   TournamentStatus,
   TeamMemberRole,
   TransactionType,
+  TransactionCategory,
   NotificationType,
 } from "../../../../generated/prisma/client";
 import {
   CreateTournamentInput,
   CreateTeamInput,
   CreateMatchInput,
+  createTournamentValidation,
 } from "./tournament.validation";
 import { notificationHelper } from "../notification/notification.helper";
 import { buildTournamentBracket } from "./tournament.bracket";
+import { stripe } from "../../../lib/stripe/stripe.client";
+import config from "../../config";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,6 +49,159 @@ const createTournamentIntoDB = async (
       creatorId,
       status: TournamentStatus.Pending,
     },
+  });
+};
+
+const ensureStripeCustomer = async (creatorId: string) => {
+  const creator = await prisma.user.findUniqueOrThrow({
+    where: { id: creatorId },
+  });
+
+  if (creator.stripeCustomerId) return creator.stripeCustomerId;
+
+  const customer = await stripe.customers.create({
+    email: creator.email,
+    name: creator.username,
+    metadata: { userId: creatorId },
+  });
+
+  await prisma.user.update({
+    where: { id: creatorId },
+    data: { stripeCustomerId: customer.id },
+  });
+
+  return customer.id;
+};
+
+const createTournamentForCreator = async (
+  creatorId: string,
+  payload: CreateTournamentInput,
+) => {
+  if (payload.prizePool === 0) {
+    const tournament = await createTournamentIntoDB(creatorId, payload);
+    return { requiresPayment: false, tournament };
+  }
+
+  const checkout = await prisma.tournamentCheckout.create({
+    data: {
+      creatorId,
+      amount: payload.prizePool,
+      payload: {
+        ...payload,
+        startDate: payload.startDate.toISOString(),
+      },
+    },
+  });
+  const stripeCustomerId = await ensureStripeCustomer(creatorId);
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer: stripeCustomerId,
+      line_items: [
+        {
+          price_data: {
+            currency: "eur",
+            product_data: { name: `Tournament prize pool: ${payload.name}` },
+            unit_amount: Math.round(payload.prizePool * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${config.client_url}/tournaments?creation=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${config.client_url}/tournaments?creation=cancelled`,
+      metadata: {
+        purpose: "tournament_prize_pool",
+        checkoutId: checkout.id,
+      },
+    });
+
+    if (!session.url) {
+      throw new AppError(
+        httpStatus.BAD_GATEWAY,
+        "Unable to create tournament payment checkout",
+      );
+    }
+
+    await prisma.tournamentCheckout.update({
+      where: { id: checkout.id },
+      data: { stripeCheckoutSessionId: session.id },
+    });
+
+    return {
+      requiresPayment: true,
+      checkoutUrl: session.url,
+      sessionId: session.id,
+    };
+  } catch (error) {
+    await prisma.tournamentCheckout.delete({ where: { id: checkout.id } });
+    throw error;
+  }
+};
+
+const handleTournamentCheckoutCompleted = async (
+  session: Stripe.Checkout.Session,
+) => {
+  const checkoutId = session.metadata?.checkoutId;
+
+  if (
+    session.metadata?.purpose !== "tournament_prize_pool" ||
+    !checkoutId ||
+    session.payment_status !== "paid"
+  ) {
+    return;
+  }
+
+  const checkout = await prisma.tournamentCheckout.findUnique({
+    where: { id: checkoutId },
+  });
+
+  if (
+    !checkout ||
+    checkout.stripeCheckoutSessionId !== session.id ||
+    Math.round(Number(checkout.amount) * 100) !== session.amount_total
+  ) {
+    return;
+  }
+
+  const payload = createTournamentValidation.parse(checkout.payload);
+  const stripePaymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id;
+
+  await prisma.$transaction(async (tx) => {
+    const claimedCheckout = await tx.tournamentCheckout.updateMany({
+      where: { id: checkout.id, tournamentId: null },
+      data: { completedAt: new Date() },
+    });
+
+    if (claimedCheckout.count === 0) return;
+
+    const tournament = await tx.tournament.create({
+      data: {
+        ...payload,
+        creatorId: checkout.creatorId,
+        status: TournamentStatus.Pending,
+      },
+    });
+
+    await tx.tournamentPaymentTransaction.create({
+      data: {
+        tournamentId: tournament.id,
+        creatorId: checkout.creatorId,
+        amount: checkout.amount,
+        currency: session.currency?.toUpperCase() ?? "EUR",
+        stripeCheckoutSessionId: session.id,
+        stripePaymentIntentId,
+        paidAt: new Date(),
+      },
+    });
+
+    await tx.tournamentCheckout.update({
+      where: { id: checkout.id },
+      data: { tournamentId: tournament.id },
+    });
   });
 };
 
@@ -359,6 +517,7 @@ const declareMatchWinnerInDB = async (
             data: {
               walletId: wallet.id,
               type: TransactionType.Credit,
+              category: TransactionCategory.TournamentPrize,
               amount: prizePerMember,
               reason: "Tournament prize",
               referenceId: match.tournamentId,
@@ -397,6 +556,8 @@ const declareMatchWinnerInDB = async (
 
 export const tournamentService = {
   createTournamentIntoDB,
+  createTournamentForCreator,
+  handleTournamentCheckoutCompleted,
   getTournamentsFromDB,
   getTournamentByIdFromDB,
   approveTournamentInDB,
