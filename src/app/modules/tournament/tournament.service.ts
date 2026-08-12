@@ -14,6 +14,7 @@ import {
   CreateMatchInput,
 } from "./tournament.validation";
 import { notificationHelper } from "../notification/notification.helper";
+import { buildTournamentBracket } from "./tournament.bracket";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ const getTournamentsFromDB = async (query: Record<string, unknown>) => {
 };
 
 const getTournamentByIdFromDB = async (tournamentId: string) => {
-  return prisma.tournament.findUniqueOrThrow({
+  const tournament = await prisma.tournament.findUniqueOrThrow({
     where: { id: tournamentId },
     include: {
       creator: { select: { id: true, username: true } },
@@ -86,6 +87,11 @@ const getTournamentByIdFromDB = async (tournamentId: string) => {
       },
     },
   });
+
+  return {
+    ...tournament,
+    bracket: buildTournamentBracket(tournament),
+  };
 };
 
 // ─── Lifecycle: approve / open registration / reject ───────────────────────
