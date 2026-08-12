@@ -39,7 +39,7 @@ const assertTournamentStatus = (
 
 // ─── Tournament CRUD ─────────────────────────────────────────────────────────
 
-const createTournamentIntoDB = async (
+const  createTournamentIntoDB = async (
   creatorId: string,
   payload: CreateTournamentInput,
 ) => {
