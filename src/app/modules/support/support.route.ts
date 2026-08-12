@@ -7,6 +7,8 @@ import {
   openConversationValidation,
   sendMessageValidation,
 } from "./support.validation";
+import { uploadFactory } from "../../helpers/uploadFactory";
+import parseData from "../../middleware/parseData";
 
 const router = Router();
 
@@ -15,6 +17,8 @@ const router = Router();
 router.post(
   "/",
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  uploadFactory({ type: "image", maxFiles: 1 }).single("image"),
+  parseData(),
   validateRequest(openConversationValidation),
   supportController.openConversation,
 );
@@ -28,6 +32,8 @@ router.get(
 router.post(
   "/:id/messages",
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  uploadFactory({ type: "image", maxFiles: 1 }).single("image"),
+  parseData(),
   validateRequest(sendMessageValidation),
   supportController.sendMessage,
 );

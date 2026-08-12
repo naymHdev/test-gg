@@ -9,6 +9,7 @@ export const createTournamentValidation = z.object({
   maxTeams: z.number().int().min(2).max(256),
   entryFee: z.number().min(0).default(0),
   prizePool: z.number().min(0).default(0),
+  rules: z.string().trim().max(5000).default(""),
   startDate: z.coerce.date(),
 });
 

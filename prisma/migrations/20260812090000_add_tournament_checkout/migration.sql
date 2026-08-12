@@ -1,3 +1,5 @@
+ALTER TABLE "tournaments" ADD COLUMN "rules" TEXT NOT NULL DEFAULT '';
+
 CREATE TABLE "tournament_checkouts" (
     "id" TEXT NOT NULL,
     "creatorId" TEXT NOT NULL,

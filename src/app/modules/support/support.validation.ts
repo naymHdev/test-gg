@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-export const openConversationValidation = z.object({
-  content: z.string().min(1, "Message content is required").max(2000),
+const supportMessageContentValidation = z.object({
+  content: z.string().trim().max(2000).optional(),
 });
 
-export const sendMessageValidation = z.object({
-  content: z.string().min(1, "Message content is required").max(2000),
-});
+export const openConversationValidation = supportMessageContentValidation;
+
+export const sendMessageValidation = supportMessageContentValidation;
 
 export type OpenConversationInput = z.infer<typeof openConversationValidation>;
 export type SendMessageInput = z.infer<typeof sendMessageValidation>;

@@ -8,11 +8,13 @@ import {
 } from "../../../../generated/prisma/client";
 import { OpenConversationInput, SendMessageInput } from "./support.validation";
 
+type SupportMessagePayload = SendMessageInput & { imageUrl?: string };
+
 // ─── Conversation lifecycle ─────────────────────────────────────────────────
 
 const openConversationIntoDB = async (
   userId: string,
-  payload: OpenConversationInput,
+  payload: OpenConversationInput & { imageUrl?: string },
 ) => {
   return prisma.$transaction(async (tx) => {
     const existingOpenConversation = await tx.supportConversation.findFirst({
@@ -34,7 +36,8 @@ const openConversationIntoDB = async (
           create: {
             senderId: userId,
             senderType: SupportSenderType.User,
-            content: payload.content,
+            content: payload.content ?? "",
+            imageUrl: payload.imageUrl,
           },
         },
       },
@@ -70,11 +73,10 @@ const closeConversationInDB = async (
 
 // ─── Messaging ───────────────────────────────────────────────────────────────
 
-const sendMessageIntoDB = async (
+const assertCanSendMessage = async (
   conversationId: string,
   requester: { id: string; role: string },
   hasViewSupportPermission: boolean,
-  payload: SendMessageInput,
 ) => {
   const conversation = await prisma.supportConversation.findUniqueOrThrow({
     where: { id: conversationId },
@@ -97,12 +99,28 @@ const sendMessageIntoDB = async (
     );
   }
 
+  return { isOwner };
+};
+
+const sendMessageIntoDB = async (
+  conversationId: string,
+  requester: { id: string; role: string },
+  hasViewSupportPermission: boolean,
+  payload: SupportMessagePayload,
+) => {
+  const { isOwner } = await assertCanSendMessage(
+    conversationId,
+    requester,
+    hasViewSupportPermission,
+  );
+
   return prisma.supportMessage.create({
     data: {
       conversationId,
       senderId: requester.id,
       senderType: isOwner ? SupportSenderType.User : SupportSenderType.Support,
-      content: payload.content,
+      content: payload.content ?? "",
+      imageUrl: payload.imageUrl,
     },
   });
 };
@@ -179,6 +197,7 @@ const getConversationByIdFromDB = async (
 export const supportService = {
   openConversationIntoDB,
   closeConversationInDB,
+  assertCanSendMessage,
   sendMessageIntoDB,
   getMyConversationsFromDB,
   getConversationsFromDB,

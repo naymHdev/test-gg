@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+const hexColor = z
+  .string()
+  .trim()
+  .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, {
+    message: "Color must be a valid hex color",
+  });
+
+const premiumBackground = z.string().trim().min(1).max(2048);
+const premiumBorderStyle = z.string().trim().min(1).max(100);
+
 const updateProfileValidation = z
   .object({
     username: z
@@ -39,9 +49,11 @@ const updateProfileValidation = z
       .optional(),
 
     bio: z.string().max(500).optional(),
-    background: z.string().optional(),
-    borderStyle: z.string().optional(),
-    nameColor: z.string().optional(),
+    background: premiumBackground.optional(),
+    borderStyle: premiumBorderStyle.optional(),
+    nameColor: hexColor.optional(),
+    postBackground: premiumBackground.optional(),
+    postBorderStyle: premiumBorderStyle.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field is required",

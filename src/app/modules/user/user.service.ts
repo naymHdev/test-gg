@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import httpStatus from "http-status";
-import { Prisma } from "../../../../generated/prisma/client";
+import { Prisma, SubscriptionStatus } from "../../../../generated/prisma/client";
 import { prisma } from "../../../shared/prisma";
 import { redis } from "../../../shared/redis";
 import AppError from "../../error/AppError";
@@ -32,7 +32,16 @@ const PROFILE_FIELDS = [
   "background",
   "borderStyle",
   "nameColor",
+  "postBackground",
+  "postBorderStyle",
 ] as const;
+const PREMIUM_PROFILE_FIELDS = new Set([
+  "background",
+  "borderStyle",
+  "nameColor",
+  "postBackground",
+  "postBorderStyle",
+]);
 
 const updateProfile = async (
   userId: string,
@@ -43,6 +52,8 @@ const updateProfile = async (
     background?: string;
     borderStyle?: string;
     nameColor?: string;
+    postBackground?: string;
+    postBorderStyle?: string;
   },
 ) => {
   const userData: Record<string, unknown> = {};
@@ -53,6 +64,24 @@ const updateProfile = async (
   }
   for (const key of PROFILE_FIELDS) {
     if (payload[key] !== undefined) profileData[key] = payload[key];
+  }
+
+  const isUpdatingPremiumCustomization = Object.keys(profileData).some((key) =>
+    PREMIUM_PROFILE_FIELDS.has(key),
+  );
+
+  if (isUpdatingPremiumCustomization) {
+    const activePremiumSubscription = await prisma.subscription.findFirst({
+      where: { userId, status: SubscriptionStatus.Active },
+      select: { id: true },
+    });
+
+    if (!activePremiumSubscription) {
+      throw new AppError(
+        httpStatus.FORBIDDEN,
+        "An active premium subscription is required to customize your profile",
+      );
+    }
   }
 
   if (typeof userData.username === "string") {
@@ -108,6 +137,32 @@ const updateProfileBanner = async (payload: {
   });
 
   return result;
+};
+
+const updatePremiumBackground = async (payload: {
+  userId: string;
+  type: "profile" | "post";
+  background: string;
+}) => {
+  const activePremiumSubscription = await prisma.subscription.findFirst({
+    where: { userId: payload.userId, status: SubscriptionStatus.Active },
+    select: { id: true },
+  });
+
+  if (!activePremiumSubscription) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "An active premium subscription is required to customize your profile",
+    );
+  }
+
+  return prisma.profile.update({
+    where: { userId: payload.userId },
+    data:
+      payload.type === "profile"
+        ? { background: payload.background }
+        : { postBackground: payload.background },
+  });
 };
 
 const getPresenceBatch = async (userIds: string[]) => {
@@ -251,6 +306,7 @@ export const UserService = {
   updateProfile,
   updateProfileAvatar,
   updateProfileBanner,
+  updatePremiumBackground,
   getPresenceBatch,
   updateNotificationSettings,
   deactivateAccount,

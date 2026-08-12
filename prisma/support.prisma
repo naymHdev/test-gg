@@ -27,7 +27,8 @@ model SupportMessage {
   sender     User?             @relation(fields: [senderId], references: [id])
   senderType SupportSenderType
 
-  content   String
+  content   String @default("")
+  imageUrl  String?
   createdAt DateTime @default(now())
 
   @@index([conversationId])

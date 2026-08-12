@@ -5,6 +5,7 @@ import { Role } from "../../../../generated/prisma/client";
 import { uploadFactory } from "../../helpers/uploadFactory";
 import validateRequest from "../../middleware/validateRequest";
 import { userValidation } from "./user.validation";
+import requireActivePremium from "../../middleware/requireActivePremium";
 
 const router = Router();
 
@@ -20,6 +21,8 @@ router.patch(
 router.patch(
   "/profile/banner",
   auth(Role.Admin, Role.Moderator, Role.Owner, Role.User),
+  uploadFactory({ type: "image", maxFiles: 1 }).single("banner"),
+  UserController.updateProfileBanner,
 );
 
 router.patch(
@@ -30,10 +33,19 @@ router.patch(
 );
 
 router.patch(
-  "/profile/banner",
+  "/profile/background",
   auth(Role.Admin, Role.Moderator, Role.Owner, Role.User),
-  uploadFactory({ type: "image", maxFiles: 1 }).single("banner"),
-  UserController.updateProfileBanner,
+  requireActivePremium,
+  uploadFactory({ type: "image", maxFiles: 1 }).single("background"),
+  UserController.updateProfileBackground,
+);
+
+router.patch(
+  "/profile/post-background",
+  auth(Role.Admin, Role.Moderator, Role.Owner, Role.User),
+  requireActivePremium,
+  uploadFactory({ type: "image", maxFiles: 1 }).single("background"),
+  UserController.updatePostBackground,
 );
 
 router.get(

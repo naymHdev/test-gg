@@ -52,7 +52,18 @@ const getPostsFromDB = async (query: Record<string, unknown>) => {
       user: {
         select: {
           username: true,
-          profile: { select: { avatarUrl: true, rank: true } },
+          isPremium: true,
+          profile: {
+            select: {
+              avatarUrl: true,
+              rank: true,
+              nameColor: true,
+              background: true,
+              borderStyle: true,
+              postBackground: true,
+              postBorderStyle: true,
+            },
+          },
         },
       },
       _count: { select: { postReactions: true, postComments: true } },

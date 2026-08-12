@@ -1,4 +1,5 @@
 import httpStatus from "http-status";
+import AppError from "../../error/AppError";
 import catchAsync from "../../utils/catchAsync";
 import sendResponse from "../../utils/sendResponse";
 import { UserService } from "./user.service";
@@ -78,6 +79,32 @@ const updateProfileBanner = catchAsync(async (req, res) => {
   });
 });
 
+const updatePremiumBackground = (type: "profile" | "post") =>
+  catchAsync(async (req, res) => {
+  const file = req.file;
+
+  if (!file) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Background image is required");
+  }
+
+  const background = await uploadToS3({
+    file,
+    fileName: `premium-backgrounds/${req.user.id}-${Date.now()}-${file.originalname}`,
+  });
+  const result = await UserService.updatePremiumBackground({
+    userId: req.user.id as string,
+    type,
+    background: background as string,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Premium background updated successfully",
+    data: result,
+  });
+  });
+
 const getPresence = catchAsync(async (req, res) => {
   const userIds = (req.query.userIds as string)?.split(",");
   const result = await UserService.getPresenceBatch(userIds);
@@ -126,6 +153,8 @@ export const UserController = {
   updateProfile,
   updateProfileAvatar,
   updateProfileBanner,
+  updateProfileBackground: updatePremiumBackground("profile"),
+  updatePostBackground: updatePremiumBackground("post"),
   getPresence,
   updateNotificationSettings,
   deactivateAccount,

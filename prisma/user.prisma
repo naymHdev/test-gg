@@ -111,6 +111,8 @@ model Profile {
     background  String?
     borderStyle String?
     nameColor   String?
+    postBackground  String?
+    postBorderStyle String?
     bio         String?
 
     rank               String?

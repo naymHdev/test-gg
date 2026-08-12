@@ -151,7 +151,7 @@ Legend: **A** = `auth()` role gate · **P** = `authorize()` permission · **O** 
 | Method | Path | Gate | Notes |
 |---|---|---|---|
 | GET | /api/tournaments | O | filter by `status`,`region` |
-| POST | /api/tournaments | A(User+) | creates with `status: Pending` |
+| POST | /api/tournaments | A(User+) | creates with `status: Pending`; accepts optional `rules` text (max 5,000 chars) |
 | GET | /api/admin/tournament-payment-transactions | A+P(manage_tournaments) | paginated prize-pool payments with tournament and creator details |
 | 🛠 PUT | /api/admin/tournaments/:id/approve | A+P(manage_tournaments) | `Pending → RegistrationOpen`, sets `approvedById/At` |
 | 🛠 PUT | /api/admin/tournaments/:id/reject | A+P(manage_tournaments) | `→ Cancelled` |
@@ -194,7 +194,7 @@ All DB writes in one `$transaction` — if the socket emit is fire-and-forget it
 ### support
 | Method | Path | Gate | Notes |
 |---|---|---|---|
-| POST | /api/support/messages | A(User+) | service: find open conversation for user or create one, then append message |
+| POST | /api/support/:id/messages | A(User+) | accepts text and/or one `image` multipart file, then appends the message |
 | 🛠 GET | /api/admin/support/conversations | A+P(view_support) | list all, filterable by `status` |
 | 🛠 PUT | /api/admin/support/conversations/:id/close | A+P(view_support) | sets `Closed`, appends a `System` message |
 

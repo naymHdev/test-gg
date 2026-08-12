@@ -10,6 +10,7 @@ model Tournament {
   maxTeams  Int
   entryFee  Decimal          @default(0) @db.Decimal(10, 2)
   prizePool Decimal          @default(0) @db.Decimal(10, 2)
+  rules     String           @default("") @db.Text
   startDate DateTime
   status    TournamentStatus @default(Pending)
 

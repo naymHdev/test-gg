@@ -1,9 +1,33 @@
 import httpStatus from "http-status";
+import { Request } from "express";
 import catchAsync from "../../utils/catchAsync";
 import sendResponse from "../../utils/sendResponse";
+import AppError from "../../error/AppError";
 import { supportService } from "./support.service";
 import { Permission } from "../../../../generated/prisma/enums";
 import { prisma } from "../../../shared/prisma";
+import { uploadToS3 } from "../../utils/s3";
+
+const getSupportMessagePayload = async (req: Request) => {
+  const content = req.body.content?.trim();
+  const file = req.file;
+
+  if (!content && !file) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Message text or an image is required",
+    );
+  }
+
+  const imageUrl = file
+    ? await uploadToS3({
+        file,
+        fileName: `support/${req.user.id}-${Date.now()}-${file.originalname}`,
+      })
+    : undefined;
+
+  return { content, imageUrl: imageUrl ?? undefined };
+};
 
 /** Owner always has full access; Moderator/Admin need the explicit grant. */
 const hasViewSupportAccess = async (user: { role: string; id: string }) => {
@@ -21,9 +45,10 @@ const hasViewSupportAccess = async (user: { role: string; id: string }) => {
 
 const openConversation = catchAsync(async (req, res) => {
   const userId = req.user.id;
+  const payload = await getSupportMessagePayload(req);
   const result = await supportService.openConversationIntoDB(
     userId as string,
-    req.body,
+    payload,
   );
 
   sendResponse(res, {
@@ -37,12 +62,20 @@ const openConversation = catchAsync(async (req, res) => {
 const sendMessage = catchAsync(async (req, res) => {
   const { id: userId, role } = req.user;
   const hasPermission = await hasViewSupportAccess(req.user);
+  const requester = { id: userId as string, role };
+
+  await supportService.assertCanSendMessage(
+    req.params.id as string,
+    requester,
+    hasPermission,
+  );
+  const payload = await getSupportMessagePayload(req);
 
   const result = await supportService.sendMessageIntoDB(
     req.params.id as string,
-    { id: userId as string, role },
+    requester,
     hasPermission,
-    req.body,
+    payload,
   );
 
   sendResponse(res, {
