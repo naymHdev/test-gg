@@ -23,7 +23,11 @@ export const handleSubscriptionWebhook = async (
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
+    // Bun's crypto only exposes SubtleCrypto (async-only) — the sync
+    // constructEvent() throws "SubtleCryptoProvider cannot be used in a
+    // synchronous context" under Bun. constructEventAsync() is the
+    // Bun-compatible equivalent; behaves identically otherwise.
+    event = await stripe.webhooks.constructEventAsync(
       payload,
       signature,
       config.stripe.subscription_webhook_secret!,
