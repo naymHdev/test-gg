@@ -22,8 +22,8 @@ model Tournament {
   approvedBy   User?     @relation("TournamentApprover", fields: [approvedById], references: [id])
   approvedAt   DateTime?
 
-  teams   Team[]
-  matches Match[]
+  teams              Team[]
+  matches            Match[]
   paymentTransaction TournamentPaymentTransaction?
 
   createdAt DateTime @default(now())
@@ -33,14 +33,14 @@ model Tournament {
 }
 
 model TournamentCheckout {
-  id                      String   @id @default(cuid())
+  id                      String    @id @default(cuid())
   creatorId               String
-  amount                  Decimal  @db.Decimal(10, 2)
+  amount                  Decimal   @db.Decimal(10, 2)
   payload                 Json
-  stripeCheckoutSessionId String?  @unique
-  tournamentId            String?  @unique
+  stripeCheckoutSessionId String?   @unique
+  tournamentId            String?   @unique
   completedAt             DateTime?
-  createdAt               DateTime @default(now())
+  createdAt               DateTime  @default(now())
 
   @@index([creatorId])
   @@map("tournament_checkouts")
@@ -96,6 +96,7 @@ model TeamMember {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   role     TeamMemberRole @default(Member)
+  position TeamPosition
   joinedAt DateTime       @default(now())
 
   @@id([teamId, userId])

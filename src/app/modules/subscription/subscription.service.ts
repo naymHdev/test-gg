@@ -280,54 +280,67 @@ const handleCheckoutSessionCompleted = async (
   });
   const user = await prisma.user.findUnique({ where: { id: userId } });
 
-  await prisma.$transaction(async (tx) => {
-    await tx.subscription.upsert({
-      where: { userId },
-      create: {
+  const activationNotificationCreated = await prisma.$transaction(
+    async (tx) => {
+      await tx.subscription.upsert({
+        where: { userId },
+        create: {
+          userId,
+          planId,
+          status: mapStripeStatus(stripeSub.status),
+          stripeSubscriptionId,
+          currentPeriodStart: new Date(
+            stripeSub.items.data[0].current_period_start * 1000,
+          ),
+          currentPeriodEnd: new Date(
+            stripeSub.items.data[0].current_period_end * 1000,
+          ),
+        },
+        update: {
+          planId,
+          status: mapStripeStatus(stripeSub.status),
+          stripeSubscriptionId,
+          currentPeriodStart: new Date(
+            stripeSub.items.data[0].current_period_start * 1000,
+          ),
+          currentPeriodEnd: new Date(
+            stripeSub.items.data[0].current_period_end * 1000,
+          ),
+          cancelAtPeriodEnd: false,
+          cancelledAt: null,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: userId },
+        data: { isPremium: true },
+      });
+
+      return notificationHelper.createNotificationOnce(tx, {
         userId,
-        planId,
-        status: mapStripeStatus(stripeSub.status),
-        stripeSubscriptionId,
-        currentPeriodStart: new Date(
-          stripeSub.items.data[0].current_period_start * 1000,
-        ),
-        currentPeriodEnd: new Date(
-          stripeSub.items.data[0].current_period_end * 1000,
-        ),
-      },
-      update: {
-        planId,
-        status: mapStripeStatus(stripeSub.status),
-        stripeSubscriptionId,
-        currentPeriodStart: new Date(
-          stripeSub.items.data[0].current_period_start * 1000,
-        ),
-        currentPeriodEnd: new Date(
-          stripeSub.items.data[0].current_period_end * 1000,
-        ),
-        cancelAtPeriodEnd: false,
-        cancelledAt: null,
-      },
-    });
+        type: NotificationType.subscription_activated,
+        title: "Premium activated",
+        body: "Your premium subscription is now active. Enjoy the perks!",
+        data: { planId },
+        dedupeKey: `stripe:subscription:${stripeSubscriptionId}:activated`,
+      });
+    },
+  );
 
-    await tx.user.update({ where: { id: userId }, data: { isPremium: true } });
-
-    await notificationHelper.createNotification(tx, {
-      userId,
-      type: NotificationType.subscription_activated,
+  if (activationNotificationCreated) {
+    notificationHelper.queuePush(userId, {
       title: "Premium activated",
       body: "Your premium subscription is now active. Enjoy the perks!",
-      data: { planId },
     });
-  });
-
-  notificationHelper.queuePush(userId, {
-    title: "Premium activated",
-    body: "Your premium subscription is now active. Enjoy the perks!",
-  });
+  }
 
   // fire-and-forget after commit, same reasoning as the ban email
-  if (user?.email && typeof session.invoice === "string" && plan) {
+  if (
+    activationNotificationCreated &&
+    user?.emailNotifications &&
+    typeof session.invoice === "string" &&
+    plan
+  ) {
     stripe.invoices
       .retrieve(session.invoice)
       .then((invoice) =>
@@ -366,11 +379,14 @@ const handleSubscriptionUpdated = async (stripeSub: Stripe.Subscription) => {
   });
 
   if (status === SubscriptionStatus.PastDue) {
-    await notificationHelper.notifyUser({
+    await notificationHelper.notifyUserOnce({
       userId: existing.userId,
       type: NotificationType.subscription_payment_failed,
       title: "Payment failed",
       body: "We couldn't renew your premium subscription. Please update your payment method.",
+      dedupeKey:
+        `stripe:subscription:${stripeSub.id}:period:` +
+        `${stripeSub.items.data[0].current_period_end}:payment-failed`,
     });
   }
 };
@@ -381,29 +397,34 @@ const handleSubscriptionDeleted = async (stripeSub: Stripe.Subscription) => {
   });
   if (!existing) return;
 
-  await prisma.$transaction(async (tx) => {
-    await tx.subscription.update({
-      where: { id: existing.id },
-      data: { status: SubscriptionStatus.Expired },
-    });
+  const cancellationNotificationCreated = await prisma.$transaction(
+    async (tx) => {
+      await tx.subscription.update({
+        where: { id: existing.id },
+        data: { status: SubscriptionStatus.Expired },
+      });
 
-    await tx.user.update({
-      where: { id: existing.userId },
-      data: { isPremium: false },
-    });
+      await tx.user.update({
+        where: { id: existing.userId },
+        data: { isPremium: false },
+      });
 
-    await notificationHelper.createNotification(tx, {
-      userId: existing.userId,
-      type: NotificationType.subscription_cancelled,
+      return notificationHelper.createNotificationOnce(tx, {
+        userId: existing.userId,
+        type: NotificationType.subscription_cancelled,
+        title: "Premium subscription ended",
+        body: "Your premium subscription has ended.",
+        dedupeKey: `stripe:subscription:${stripeSub.id}:cancelled`,
+      });
+    },
+  );
+
+  if (cancellationNotificationCreated) {
+    notificationHelper.queuePush(existing.userId, {
       title: "Premium subscription ended",
       body: "Your premium subscription has ended.",
     });
-  });
-
-  notificationHelper.queuePush(existing.userId, {
-    title: "Premium subscription ended",
-    body: "Your premium subscription has ended.",
-  });
+  }
 };
 
 export const subscriptionService = {

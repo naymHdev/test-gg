@@ -72,7 +72,11 @@ const updateProfile = async (
 
   if (isUpdatingPremiumCustomization) {
     const activePremiumSubscription = await prisma.subscription.findFirst({
-      where: { userId, status: SubscriptionStatus.Active },
+      where: {
+        userId,
+        status: SubscriptionStatus.Active,
+        currentPeriodEnd: { gt: new Date() },
+      },
       select: { id: true },
     });
 
@@ -145,7 +149,11 @@ const updatePremiumBackground = async (payload: {
   background: string;
 }) => {
   const activePremiumSubscription = await prisma.subscription.findFirst({
-    where: { userId: payload.userId, status: SubscriptionStatus.Active },
+    where: {
+      userId: payload.userId,
+      status: SubscriptionStatus.Active,
+      currentPeriodEnd: { gt: new Date() },
+    },
     select: { id: true },
   });
 

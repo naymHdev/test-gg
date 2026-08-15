@@ -6,7 +6,11 @@ import catchAsync from "../utils/catchAsync";
 
 const requireActivePremium = catchAsync(async (req, _res, next) => {
   const subscription = await prisma.subscription.findFirst({
-    where: { userId: req.user.id as string, status: SubscriptionStatus.Active },
+    where: {
+      userId: req.user.id as string,
+      status: SubscriptionStatus.Active,
+      currentPeriodEnd: { gt: new Date() },
+    },
     select: { id: true },
   });
 

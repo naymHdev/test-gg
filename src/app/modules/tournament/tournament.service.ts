@@ -9,6 +9,7 @@ import {
   TransactionType,
   TransactionCategory,
   NotificationType,
+  TeamPosition,
 } from "../../../../generated/prisma/client";
 import {
   CreateTournamentInput,
@@ -20,26 +21,14 @@ import { notificationHelper } from "../notification/notification.helper";
 import { buildTournamentBracket } from "./tournament.bracket";
 import { stripe } from "../../../lib/stripe/stripe.client";
 import config from "../../config";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Throws unless the tournament is currently in one of the allowed statuses. */
-const assertTournamentStatus = (
-  status: TournamentStatus,
-  allowed: TournamentStatus[],
-  action: string,
-) => {
-  if (!allowed.includes(status)) {
-    throw new AppError(
-      httpStatus.BAD_REQUEST,
-      `Cannot ${action} while tournament status is "${status}"`,
-    );
-  }
-};
+import {
+  assertTournamentStatus,
+  resolveRiotIdToUser,
+} from "./tournament.helper";
 
 // ─── Tournament CRUD ─────────────────────────────────────────────────────────
 
-const  createTournamentIntoDB = async (
+const createTournamentIntoDB = async (
   creatorId: string,
   payload: CreateTournamentInput,
 ) => {
@@ -351,6 +340,29 @@ const registerTeamIntoDB = async (
   captainId: string,
   payload: CreateTeamInput,
 ) => {
+  // const resolvedMembers = await Promise.all(
+  //   payload.members.map(async (member) => ({
+  //     position: member.position as TeamPosition,
+  //     user: await resolveRiotIdToUser(member.riotId),
+  //   })),
+  // );
+
+  // const uniqueUserIds = new Set(resolvedMembers.map((m) => m.user.id));
+  // if (uniqueUserIds.size !== resolvedMembers.length) {
+  //   throw new AppError(
+  //     httpStatus.BAD_REQUEST,
+  //     "Two of the Riot IDs entered belong to the same FinderQ account",
+  //   );
+  // }
+
+  // const captainEntry = resolvedMembers.find((m) => m.user.id === captainId);
+  // if (!captainEntry) {
+  //   throw new AppError(
+  //     httpStatus.BAD_REQUEST,
+  //     "You must include your own Riot ID as one of the 5 team members",
+  //   );
+  // }
+
   return prisma.$transaction(async (tx) => {
     const tournament = await tx.tournament.findUniqueOrThrow({
       where: { id: tournamentId },
@@ -387,15 +399,43 @@ const registerTeamIntoDB = async (
         name: payload.name,
         captainId,
         members: {
-          create: {
-            userId: captainId,
+          create: payload.members.map((m) => ({
+            userId: m.riotId,
             tournamentId,
-            role: TeamMemberRole.Captain,
-          },
+            position: m.position,
+            role:
+              m.riotId === captainId
+                ? TeamMemberRole.Captain
+                : TeamMemberRole.Member,
+          })),
         },
       },
-      include: { members: true },
+      include: {
+        members: { include: { user: { select: { username: true } } } },
+      },
     });
+
+    // return tx.team.create({
+    //   data: {
+    //     tournamentId,
+    //     name: payload.name,
+    //     captainId,
+    //     members: {
+    //       create: resolvedMembers.map((m) => ({
+    //         userId: m.user.id,
+    //         tournamentId,
+    //         position: m.position,
+    //         role:
+    //           m.user.id === captainId
+    //             ? TeamMemberRole.Captain
+    //             : TeamMemberRole.Member,
+    //       })),
+    //     },
+    //   },
+    //   include: {
+    //     members: { include: { user: { select: { username: true } } } },
+    //   },
+    // });
   });
 };
 

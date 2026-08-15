@@ -13,6 +13,21 @@ type NotificationInput = {
   data?: Record<string, unknown>;
 };
 
+type DeduplicatedNotificationInput = NotificationInput & {
+  dedupeKey: string;
+};
+
+const toCreateData = (
+  input: NotificationInput & { dedupeKey?: string },
+) => ({
+  userId: input.userId,
+  type: input.type,
+  title: input.title,
+  body: input.body,
+  data: input.data as Prisma.InputJsonValue,
+  dedupeKey: input.dedupeKey,
+});
+
 // FCM's `data` payload must be flat string key/value pairs — this repo's
 // Notification.data is a free-form Json column, so stringify on the way out.
 const toStringData = (
@@ -37,14 +52,22 @@ const createNotification = (
   input: NotificationInput,
 ) =>
   tx.notification.create({
-    data: {
-      userId: input.userId,
-      type: input.type,
-      title: input.title,
-      body: input.body,
-      data: input.data as Prisma.InputJsonValue,
-    },
+    data: toCreateData(input),
   });
+
+// The unique key makes webhook-driven inserts safe across concurrent retries.
+// Callers can use the boolean to avoid repeating email or push side effects.
+const createNotificationOnce = async (
+  tx: Prisma.TransactionClient,
+  input: DeduplicatedNotificationInput,
+): Promise<boolean> => {
+  const result = await tx.notification.createMany({
+    data: toCreateData(input),
+    skipDuplicates: true,
+  });
+
+  return result.count === 1;
+};
 
 // ─── Push — call this AFTER the transaction that called createNotification
 // has committed, same "fire-and-forget after commit" pattern already used
@@ -98,13 +121,28 @@ const queuePush = async (
 // for the DB write and call queuePush(...) yourself once the transaction commits.
 const notifyUser = async (input: NotificationInput) => {
   const notification = await prisma.notification.create({
-    data: {
-      userId: input.userId,
-      type: input.type,
-      title: input.title,
-      body: input.body,
-      data: input.data as Prisma.InputJsonValue,
-    },
+    data: toCreateData(input),
+  });
+
+  queuePush(input.userId, {
+    title: input.title,
+    body: input.body,
+    data: input.data,
+  }).catch(() => null);
+
+  return notification;
+};
+
+const notifyUserOnce = async (input: DeduplicatedNotificationInput) => {
+  const result = await prisma.notification.createMany({
+    data: toCreateData(input),
+    skipDuplicates: true,
+  });
+
+  if (result.count === 0) return null;
+
+  const notification = await prisma.notification.findUniqueOrThrow({
+    where: { dedupeKey: input.dedupeKey },
   });
 
   queuePush(input.userId, {
@@ -118,6 +156,8 @@ const notifyUser = async (input: NotificationInput) => {
 
 export const notificationHelper = {
   createNotification,
+  createNotificationOnce,
   queuePush,
   notifyUser,
+  notifyUserOnce,
 };

@@ -1,10 +1,13 @@
 import { prisma } from "../../../shared/prisma";
 import {
+  AccountStatus,
   NotificationType,
   Prisma,
+  SubscriptionStatus,
 } from "../../../../generated/prisma/client";
+import httpStatus from "http-status";
 import { PaginationQuery, paginate } from "../../helpers/paginate";
-import { sendMulticastPush } from "../../../utils/fcm.helper";
+import AppError from "../../error/AppError";
 import {
   RegisterDeviceTokenInput,
   BroadcastNotificationInput,
@@ -40,16 +43,33 @@ const getMyNotificationsFromDB = async (
     where: { userId },
     pagination,
     defaults: { sortBy: "createdAt", sortOrder: "desc" },
+    select: {
+      id: true,
+      userId: true,
+      type: true,
+      title: true,
+      body: true,
+      data: true,
+      isRead: true,
+      createdAt: true,
+    },
   });
 
 const getUnreadCountFromDB = async (userId: string) =>
   prisma.notification.count({ where: { userId, isRead: false } });
 
-const markAsReadInDB = async (userId: string, notificationId: string) =>
-  prisma.notification.updateMany({
+const markAsReadInDB = async (userId: string, notificationId: string) => {
+  const result = await prisma.notification.updateMany({
     where: { id: notificationId, userId },
     data: { isRead: true },
   });
+
+  if (result.count === 0) {
+    throw new AppError(httpStatus.NOT_FOUND, "Notification not found");
+  }
+
+  return result;
+};
 
 const markAllAsReadInDB = async (userId: string) =>
   prisma.notification.updateMany({
@@ -58,15 +78,28 @@ const markAllAsReadInDB = async (userId: string) =>
   });
 
 // ─── Admin broadcast ─────────────────────────────────────────────────────────
-// Fans a single announcement out to every matching user: one Notification
-// row per recipient (so each shows up in their inbox / unread count) plus a
-// single chunked FCM multicast covering every recipient's devices.
+// Fans a single announcement out to every matching active user: one
+// Notification row per recipient so it shows in the web inbox/unread count.
 
-const broadcastNotificationToDB = async (payload: BroadcastNotificationInput) => {
+const broadcastNotificationToDB = async (
+  payload: BroadcastNotificationInput,
+) => {
   const recipients = await prisma.user.findMany({
     where: {
+      status: {
+        in: [AccountStatus.Active, AccountStatus.Warned],
+      },
       ...(payload.roles?.length ? { role: { in: payload.roles } } : {}),
-      ...(payload.premiumOnly ? { isPremium: true } : {}),
+      ...(payload.premiumOnly
+        ? {
+            subscription: {
+              is: {
+                status: SubscriptionStatus.Active,
+                currentPeriodEnd: { gt: new Date() },
+              },
+            },
+          }
+        : {}),
     },
     select: { id: true },
   });
@@ -85,23 +118,10 @@ const broadcastNotificationToDB = async (payload: BroadcastNotificationInput) =>
     })),
   });
 
-  const devices = await prisma.deviceToken.findMany({
-    where: { userId: { in: recipients.map((r) => r.id) } },
-    select: { token: true },
-  });
-
-  const pushResults =
-    devices.length > 0
-      ? await sendMulticastPush({
-          tokens: devices.map((d) => d.token),
-          title: payload.title,
-          body: payload.body,
-        })
-      : [];
-
   return {
     recipientCount: recipients.length,
-    pushedDeviceCount: pushResults.filter((r) => r.success).length,
+    // Kept for API compatibility; this project currently uses web/email only.
+    pushedDeviceCount: 0,
   };
 };
 

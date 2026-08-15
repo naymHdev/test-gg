@@ -8,6 +8,9 @@ model Notification {
   body  String
   data  Json?
 
+  // Optional idempotency key for notifications created by retried webhooks.
+  dedupeKey String? @unique
+
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 

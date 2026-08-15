@@ -143,7 +143,9 @@ const banUserInDB = async (
   });
 
   // fire-and-forget after commit, same reasoning as socket emits elsewhere
-  sendAccountBannedEmail(bannedUser.email, payload.reason).catch(() => null);
+  if (bannedUser.emailNotifications) {
+    sendAccountBannedEmail(bannedUser.email, payload.reason).catch(() => null);
+  }
   notificationHelper.queuePush(userId, {
     title: "Your account has been banned",
     body: payload.reason,

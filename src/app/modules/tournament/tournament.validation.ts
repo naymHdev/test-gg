@@ -13,9 +13,44 @@ export const createTournamentValidation = z.object({
   startDate: z.coerce.date(),
 });
 
-export const createTeamValidation = z.object({
-  name: z.string().min(2).max(100),
+const teamMemberInput = z.object({
+  position: z.enum(["Top", "Jungle", "Mid", "ADC", "Support"], {
+    message: "position must be Top, Jungle, Mid, ADC, or Support",
+  }),
+  riotId: z
+    .string({ message: "Riot ID is required" })
+    .regex(/^.+#.+$/, "Riot ID must be in the form Name#Tag"),
 });
+
+export const createTeamValidation = z
+  .object({
+    name: z.string().min(2).max(100),
+    members: z
+      .array(teamMemberInput)
+      .length(
+        5,
+        "Exactly 5 players are required (Top, Jungle, Mid, ADC, Support)",
+      ),
+  })
+  .superRefine((data, ctx) => {
+    const positions = data.members.map((m) => m.position);
+    if (new Set(positions).size !== positions.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Each position must be filled exactly once — no duplicates",
+        path: ["members"],
+      });
+    }
+
+    const riotIds = data.members.map((m) => m.riotId.toLowerCase());
+    if (new Set(riotIds).size !== riotIds.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "The same Riot ID was entered more than once",
+        path: ["members"],
+      });
+    }
+  });
 
 export const createMatchValidation = z
   .object({

@@ -126,6 +126,14 @@ enum TeamMemberRole {
     Member
 }
 
+enum TeamPosition {
+    Top
+    Jungle
+    Mid
+    ADC
+    Support
+}
+
 enum MatchStatus {
     Scheduled
     Live
