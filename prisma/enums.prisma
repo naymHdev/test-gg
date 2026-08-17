@@ -16,6 +16,11 @@ enum AccountStatus {
     Deleted
 }
 
+enum AuthProvider {
+    Email
+    Google
+}
+
 enum Region {
     EUW
     EUNE

@@ -15,9 +15,12 @@ import {
 import { TLoginInput, TRegisterInput } from "./auth.interface";
 import { TDeviceMeta } from "../../helpers/deviceMeta";
 import { paginate, PaginationQuery } from "../../helpers/paginate";
+import { OAuth2Client } from "google-auth-library";
 
 const pendingRegKey = (email: string) => `pending_registration:${email}`;
 const resetTokenKey = (token: string) => `reset_token:${token}`;
+
+const googleClient = new OAuth2Client(config.google.client_id);
 
 // ---------------------------------------------------------------- Register
 const registerIntoDB = async (payload: TRegisterInput) => {
@@ -118,7 +121,7 @@ const loginWithCredentials = async (
 
   const passwordMatches = await bcrypt.compare(
     payload.password,
-    user.passwordHash,
+    user.passwordHash as string,
   );
   if (!passwordMatches) {
     throw new AppError(httpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS");
@@ -328,7 +331,7 @@ const changePassword = async (
 
   const passwordMatches = await bcrypt.compare(
     currentPassword,
-    user.passwordHash,
+    user.passwordHash as string,
   );
   if (!passwordMatches) {
     throw new AppError(
@@ -374,10 +377,116 @@ const getLoginHistory = async (userId: string, options: PaginationQuery) => {
   });
 };
 
+const loginWithGoogle = async (
+  payload: {
+    idToken: string;
+    region?: string;
+    language?: string;
+    agreedToTerms?: boolean;
+    agreedToPrivacy?: boolean;
+    stayLoggedIn?: boolean;
+  },
+  deviceMeta: TDeviceMeta,
+) => {
+
+  console.log("payload_________",payload);
+
+  const ticket = await googleClient.verifyIdToken({
+    idToken: payload.idToken,
+    audience: config.google.client_id,
+  });
+
+  const googlePayload = ticket.getPayload();
+  if (!googlePayload?.email) {
+    throw new AppError(httpStatus.UNAUTHORIZED, "AUTH_INVALID_GOOGLE_TOKEN");
+  }
+  if (!googlePayload.email_verified) {
+    throw new AppError(
+      httpStatus.UNAUTHORIZED,
+      "AUTH_GOOGLE_EMAIL_NOT_VERIFIED",
+    );
+  }
+
+  const { sub: googleId, email, name } = googlePayload;
+
+  let user = await prisma.user.findFirst({
+    where: { OR: [{ googleId }, { email }] },
+  });
+
+  if (user) {
+    if (user.status === "Banned") {
+      throw new AppError(httpStatus.FORBIDDEN, "AUTH_ACCOUNT_BANNED");
+    }
+    if (user.status === "Suspended") {
+      throw new AppError(httpStatus.FORBIDDEN, "AUTH_ACCOUNT_SUSPENDED");
+    }
+    if (user.status === "Deleted") {
+      throw new AppError(httpStatus.FORBIDDEN, "AUTH_ACCOUNT_DELETED");
+    }
+
+    if (!user.googleId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId, authProvider: "Google" },
+      });
+    }
+
+    if (user.status === "Deactivated") {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { status: "Active" },
+      });
+    }
+  } else {
+    if (!payload.region || !payload.language) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "AUTH_GOOGLE_SIGNUP_REQUIRES_REGION_LANGUAGE",
+      );
+    }
+    if (!payload.agreedToTerms || !payload.agreedToPrivacy) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "AUTH_MUST_AGREE_TERMS_PRIVACY",
+      );
+    }
+
+    const username = await authUtils.generateUniqueUsername(
+      name || email.split("@")[0],
+    );
+
+    user = await prisma.$transaction(async (tx: any) => {
+      return tx.user.create({
+        data: {
+          username,
+          email,
+          googleId,
+          authProvider: "Google",
+          region: payload.region,
+          accountLanguage: payload.language,
+          agreedToTerms: payload.agreedToTerms,
+          agreedToPrivacy: payload.agreedToPrivacy,
+          profile: { create: {} },
+          wallet: { create: {} },
+          userPoints: { create: {} },
+        },
+      });
+    });
+  }
+
+  return issueTokenPair(
+    user?.id!,
+    user?.role!,
+    !!payload.stayLoggedIn,
+    deviceMeta,
+  );
+};
+
 export const authService = {
   registerIntoDB,
   verifyRegisterOtp,
   loginWithCredentials,
+  loginWithGoogle,
   verifyLoginOtp,
   refreshAccessToken,
   logout,

@@ -4,10 +4,10 @@
 
 <!-- -------------------------- DEW Works -------------------------- -->
 <!-- 
-1. Media page users profile details
+1. Media page users profile details ✅
 2. Fetch My Tournaments
 3. Voice channel group messaging image message option update need!
-4. Media: https://finderq.gg/euw -- profile reputation update need
+4. Media: https://finderq.gg/euw -- profile reputation update need ✅
  -->
 <!-- -------------------------- END -------------------------- -->
 

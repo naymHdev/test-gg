@@ -2,9 +2,12 @@ model User {
     id           String        @id @default(cuid())
     username     String        @unique
     email        String        @unique
-    passwordHash String
+    passwordHash String?
     role         Role          @default(User)
     status       AccountStatus @default(Active)
+
+    authProvider AuthProvider @default(Email)
+    googleId     String?      @unique
 
     region          Region
     accountLanguage Language // immutable after registration

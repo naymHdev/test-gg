@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import config from "../../config";
 import { TJwtPayload } from "./auth.interface";
+import { prisma } from "../../../shared/prisma";
 
 const signPendingToken = (payload: { email: string }) =>
   jwt.sign(payload, config.jwt.pending_secret as string, { expiresIn: "15m" });
@@ -28,6 +29,23 @@ const verifyRefreshToken = (token: string) =>
 const verifyAccessToken = (token: string) =>
   jwt.verify(token, config.jwt.access_secret as string) as TJwtPayload;
 
+const generateUniqueUsername = async (base: string) => {
+  const cleanBase = base.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 15) || "player";
+  let username = cleanBase;
+  let suffix = 0;
+
+  while (
+    await prisma.user.findFirst({
+      where: { username: { equals: username, mode: "insensitive" } },
+    })
+  ) {
+    suffix += 1;
+    username = `${cleanBase}${suffix}`;
+  }
+
+  return username;
+};
+
 export const authUtils = {
   signPendingToken,
   verifyPendingToken,
@@ -35,4 +53,5 @@ export const authUtils = {
   signRefreshToken,
   verifyRefreshToken,
   verifyAccessToken,
+  generateUniqueUsername,
 };

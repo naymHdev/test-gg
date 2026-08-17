@@ -101,6 +101,55 @@ const toggleTwoFactorValidation = z.object({
   enabled: z.boolean({ message: "enabled is required" }),
 });
 
+const googleLoginValidation = z.object({
+  idToken: z.string({ message: "idToken is required" }),
+  region: z
+    .enum([
+      "EUW",
+      "EUNE",
+      "NA",
+      "KR",
+      "BR",
+      "LAN_LAS",
+      "OCE",
+      "TR",
+      "JP",
+      "ME_SEA",
+    ])
+    .optional(),
+  language: z
+    .enum([
+      "en",
+      "ro",
+      "pl",
+      "tr",
+      "fr",
+      "de",
+      "es",
+      "it",
+      "pt",
+      "ru",
+      "el",
+      "hu",
+      "cs",
+      "sk",
+      "nl",
+      "sv",
+      "da",
+      "no",
+      "fi",
+      "bg",
+      "uk",
+      "sr",
+      "hr",
+      "sl",
+    ])
+    .optional(),
+  agreedToTerms: z.boolean().optional(),
+  agreedToPrivacy: z.boolean().optional(),
+  stayLoggedIn: z.boolean().default(false),
+});
+
 export const authValidation = {
   registerValidation,
   loginValidation,
@@ -109,4 +158,5 @@ export const authValidation = {
   resetPasswordValidation,
   changePasswordValidation,
   toggleTwoFactorValidation,
+  googleLoginValidation,
 };

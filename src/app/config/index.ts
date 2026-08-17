@@ -113,4 +113,8 @@ export default {
   getStream,
   riot,
   paypal,
+
+  google: {
+    client_id: process.env.GOOGLE_CLIENT_ID as string,
+},
 };

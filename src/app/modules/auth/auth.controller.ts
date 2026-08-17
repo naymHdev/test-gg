@@ -187,10 +187,27 @@ const getLoginHistory = catchAsync(async (req, res) => {
   });
 });
 
+const googleLogin = catchAsync(async (req, res) => {
+  const deviceMeta = extractDeviceMeta(req);
+  const result = await authService.loginWithGoogle(req.body, deviceMeta);
+
+  setRefreshCookie(res, result.refreshToken);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Logged in with Google successfully",
+    data: {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    },
+  });
+});
+
 export const authController = {
   register,
   verifyOtp,
   login,
+  googleLogin,
   refresh,
   logout,
   forgotPassword,

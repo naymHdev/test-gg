@@ -27,6 +27,13 @@ router.post(
   authController.login,
 );
 
+router.post(
+  "/google",
+  rateLimiter.login,
+  validateRequest(authValidation.googleLoginValidation),
+  authController.googleLogin,
+);
+
 router.post("/logout", authController.logout);
 router.post("/refresh", authController.refresh);
 
