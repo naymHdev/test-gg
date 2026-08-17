@@ -17,6 +17,7 @@ import { messageRouter } from "../modules/message/message.route";
 import { mediaRouter } from "../modules/media/media.route";
 import { channelRoutes } from "../channel/channel.route";
 import { riotRoutes } from "../modules/riot/riot.route";
+import { reviewsRoutes } from "../reviews/reviews.route";
 
 const router = Router();
 
@@ -39,6 +40,7 @@ const moduleRoutes = [
   { path: "/media", route: mediaRouter },
   { path: "/channels", route: channelRoutes },
   { path: "/riot", route: riotRoutes },
+  { path: "/reviews", route: reviewsRoutes },
 ];
 
 moduleRoutes.forEach((route) => {

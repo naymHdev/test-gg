@@ -1,7 +1,10 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import httpStatus from "http-status";
-import { Prisma, SubscriptionStatus } from "../../../../generated/prisma/client";
+import {
+  Prisma,
+  SubscriptionStatus,
+} from "../../../../generated/prisma/client";
 import { prisma } from "../../../shared/prisma";
 import { redis } from "../../../shared/redis";
 import AppError from "../../error/AppError";
@@ -309,6 +312,204 @@ const deleteAccount = async (userId: string, password: string) => {
   sendAccountDeletedEmail(user.email).catch(() => null);
 };
 
+const contentBreakdown = async (userId: string) => {
+  const [user, mediaPostStats, categoryStats] = await prisma.$transaction([
+    // 1. User info + recent media posts
+    prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        username: true,
+        createdAt: true,
+        isPremium: true,
+        isRiotVerified: true,
+
+        profile: {
+          select: {
+            avatarUrl: true,
+          },
+        },
+
+        // Recent 10 media posts
+        mediaPosts: {
+          where: {
+            deletedAt: null,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 2,
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            category: true,
+            language: true,
+            reactionsCount: true,
+            views: true,
+            isPremium: true,
+            createdAt: true,
+
+            images: {
+              orderBy: {
+                order: "asc",
+              },
+              select: {
+                id: true,
+                url: true,
+                order: true,
+              },
+            },
+
+            mediaVideos: {
+              orderBy: {
+                order: "asc",
+              },
+              select: {
+                id: true,
+                url: true,
+                order: true,
+              },
+            },
+
+            _count: {
+              select: {
+                comments: {
+                  where: {
+                    deletedAt: null,
+                  },
+                },
+              },
+            },
+          },
+        },
+
+        _count: {
+          select: {
+            friendsInitiated: true,
+            friendsReceived: true,
+          },
+        },
+      },
+    }),
+
+    // 2. ALL media post count + total reactions
+    prisma.mediaPost.aggregate({
+      where: {
+        userId,
+        deletedAt: null,
+      },
+
+      _count: {
+        id: true,
+      },
+
+      _sum: {
+        reactionsCount: true,
+        views: true,
+      },
+    }),
+
+    // 3. Content category breakdown
+    prisma.mediaPost.groupBy({
+      by: ["category"],
+
+      where: {
+        userId,
+        deletedAt: null,
+      },
+
+      _count: {
+        id: true,
+      },
+
+      orderBy: {
+        _count: {
+          id: "desc",
+        },
+      },
+    }),
+  ]);
+
+  if (!user) {
+    return null;
+  }
+
+  // Screenshot / Clip / Meme / Highlight
+  const categoryBreakdown = categoryStats.reduce<Record<string, number>>(
+    (acc, item) => {
+      acc[item.category.toLowerCase()] = item._count.id;
+      return acc;
+    },
+    {},
+  );
+
+  // groupBy already sorted DESC
+  const mostPostedType =
+    categoryStats.length > 0 ? categoryStats[0].category : null;
+
+  return {
+    profileInfo: {
+      id: user.id,
+      name: user.username,
+      avatar: user.profile?.avatarUrl ?? null,
+      createdAt: user.createdAt,
+      isPremium: user.isPremium,
+      isRiotVerified: user.isRiotVerified,
+    },
+
+    badges: ["Top Poster", "Early Adopter"],
+
+    stats: {
+      // Total non-deleted MediaPosts
+      posts: mediaPostStats._count.id,
+
+      followers: user._count.friendsInitiated,
+      following: user._count.friendsReceived,
+
+      // Total reactions received on ALL MediaPosts
+      totalQReceived: mediaPostStats._sum.reactionsCount ?? 0,
+
+      // Optional
+      totalViews: mediaPostStats._sum.views ?? 0,
+    },
+
+    contentBreakdown: {
+      screenshot: categoryBreakdown.screenshot ?? 0,
+      clip: categoryBreakdown.clip ?? 0,
+      meme: categoryBreakdown.meme ?? 0,
+      highlight: categoryBreakdown.highlight ?? 0,
+
+      mostPostedType,
+    },
+
+    recentPosts: user.mediaPosts.map((post) => ({
+      id: post.id,
+      title: post.title,
+      description: post.description,
+      category: post.category,
+
+      reactionCount: post.reactionsCount,
+      commentCount: post._count.comments,
+      views: post.views,
+
+      isPremium: post.isPremium,
+      language: post.language,
+
+      images: post.images,
+      videos: post.mediaVideos,
+
+      createdAt: post.createdAt,
+    })),
+  };
+};
+
+const playerReputation = async (userId: string) => {
+  console.log("userID_____", userId);
+};
+
 export const UserService = {
   getUserProfileFromDB,
   updateProfile,
@@ -319,4 +520,6 @@ export const UserService = {
   updateNotificationSettings,
   deactivateAccount,
   deleteAccount,
+  contentBreakdown,
+  playerReputation,
 };

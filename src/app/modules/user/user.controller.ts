@@ -81,28 +81,31 @@ const updateProfileBanner = catchAsync(async (req, res) => {
 
 const updatePremiumBackground = (type: "profile" | "post") =>
   catchAsync(async (req, res) => {
-  const file = req.file;
+    const file = req.file;
 
-  if (!file) {
-    throw new AppError(httpStatus.BAD_REQUEST, "Background image is required");
-  }
+    if (!file) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "Background image is required",
+      );
+    }
 
-  const background = await uploadToS3({
-    file,
-    fileName: `premium-backgrounds/${req.user.id}-${Date.now()}-${file.originalname}`,
-  });
-  const result = await UserService.updatePremiumBackground({
-    userId: req.user.id as string,
-    type,
-    background: background as string,
-  });
+    const background = await uploadToS3({
+      file,
+      fileName: `premium-backgrounds/${req.user.id}-${Date.now()}-${file.originalname}`,
+    });
+    const result = await UserService.updatePremiumBackground({
+      userId: req.user.id as string,
+      type,
+      background: background as string,
+    });
 
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Premium background updated successfully",
-    data: result,
-  });
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Premium background updated successfully",
+      data: result,
+    });
   });
 
 const getPresence = catchAsync(async (req, res) => {
@@ -148,6 +151,30 @@ const deleteAccount = catchAsync(async (req, res) => {
   });
 });
 
+const contentBreakdown = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const result = await UserService.contentBreakdown(id as string);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User Content Breakdown fetch successfully!",
+    data: result,
+  });
+});
+
+const playerReputation = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const result = await UserService.playerReputation(id as string);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User Content Breakdown fetch successfully!",
+    data: result,
+  });
+});
+
 export const UserController = {
   getUserProfile,
   updateProfile,
@@ -159,4 +186,6 @@ export const UserController = {
   updateNotificationSettings,
   deactivateAccount,
   deleteAccount,
+  contentBreakdown,
+  playerReputation,
 };

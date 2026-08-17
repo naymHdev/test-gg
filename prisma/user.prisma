@@ -51,12 +51,12 @@ model User {
     posts      Post[]
     mediaPosts MediaPost[]
 
-    createdTournaments  Tournament[] @relation("TournamentCreator")
-    approvedTournaments Tournament[] @relation("TournamentApprover")
+    createdTournaments            Tournament[]                   @relation("TournamentCreator")
+    approvedTournaments           Tournament[]                   @relation("TournamentApprover")
     tournamentPaymentTransactions TournamentPaymentTransaction[] @relation("TournamentPaymentCreator")
-    capturedTeams       Team[]       @relation("TeamCaptain")
-    teamMemberships     TeamMember[]
-    declaredMatches     Match[]      @relation("MatchDeclaredBy")
+    capturedTeams                 Team[]                         @relation("TeamCaptain")
+    teamMemberships               TeamMember[]
+    declaredMatches               Match[]                        @relation("MatchDeclaredBy")
 
     createdChallenges    Challenge[]
     challengeEnrollments ChallengeEnrollment[]
@@ -98,6 +98,9 @@ model User {
     paymentMethods       PaymentMethod[]
     withdrawalRequests   WithdrawalRequest[]
 
+    reviewsGiven    PlayerReview[] @relation("ReviewsGiven")
+    reviewsReceived PlayerReview[] @relation("ReviewsReceived")
+
     @@index([region, accountLanguage])
     @@map("users")
 }
@@ -106,14 +109,14 @@ model Profile {
     userId String @id
     user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    avatarUrl   String?
-    bannerUrl   String?
-    background  String?
-    borderStyle String?
-    nameColor   String?
+    avatarUrl       String?
+    bannerUrl       String?
+    background      String?
+    borderStyle     String?
+    nameColor       String?
     postBackground  String?
     postBorderStyle String?
-    bio         String?
+    bio             String?
 
     rank               String?
     lp                 Int?
@@ -159,10 +162,6 @@ model RefreshToken {
     @@map("refresh_tokens")
 }
 
-// One row per device's FCM registration token — same shape as RefreshToken so
-// a user can be logged into (and pushed to) several devices at once. A token
-// gets pruned here the moment Firebase reports it as unregistered/invalid,
-// so the multicast list stays clean without a background job.
 model DeviceToken {
     id     String @id @default(cuid())
     userId String
@@ -176,4 +175,29 @@ model DeviceToken {
 
     @@index([userId])
     @@map("device_tokens")
+}
+
+model PlayerReview {
+    id String @id @default(cuid())
+
+    // who give review
+    reviewerId String
+    reviewer   User   @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+
+    // Who should be given a review?
+    reviewedUserId String
+    reviewedUser   User   @relation("ReviewsReceived", fields: [reviewedUserId], references: [id], onDelete: Cascade)
+
+    // 1 - 5
+    rating Int
+    review String? @db.VarChar(500)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([reviewerId, reviewedUserId])
+    @@index([reviewedUserId, rating])
+    @@index([reviewerId])
+    @@index([reviewedUserId, createdAt])
+    @@map("player_reviews")
 }

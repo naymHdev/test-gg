@@ -11,6 +11,18 @@ const router = Router();
 
 router.get("/:username/profile", UserController.getUserProfile);
 
+router.get(
+  "/:id/content-breakdown",
+  auth(Role.Admin, Role.Moderator, Role.Owner, Role.User),
+  UserController.contentBreakdown,
+);
+
+router.get(
+  "/:id/player-reputation",
+  auth(Role.Admin, Role.Moderator, Role.Owner, Role.User),
+  UserController.playerReputation,
+);
+
 router.patch(
   "/profile",
   auth(Role.Admin, Role.Moderator, Role.Owner, Role.User),
