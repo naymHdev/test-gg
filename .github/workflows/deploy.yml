@@ -78,6 +78,8 @@ jobs:
             cd "${{ secrets.VPS_DEPLOY_PATH }}"
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             docker compose pull app
-            docker compose down app
+            docker compose down app --remove-orphans || true
+            docker container rm -f awakero-backend || true
+            docker network rm awakero_backend_default || true
             docker compose up -d --no-build app
             docker image prune -f
