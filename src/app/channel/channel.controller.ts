@@ -208,11 +208,18 @@ const transferOwnership = catchAsync(async (req, res) => {
 });
 
 const sendMessage = catchAsync(async (req, res) => {
+  const files = req.files as {
+    image?: Express.Multer.File[];
+    file?: Express.Multer.File[];
+  };
+
   const result = await channelMessageService.sendMessage(
     req.params.channelId as string,
     req.user.id,
     req.body,
+    { image: files?.image?.[0], file: files?.file?.[0] },
   );
+
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
@@ -220,7 +227,6 @@ const sendMessage = catchAsync(async (req, res) => {
     data: result,
   });
 });
-
 const editMessage = catchAsync(async (req, res) => {
   const result = await channelMessageService.editMessage(
     req.params.channelId as string,

@@ -389,8 +389,6 @@ const loginWithGoogle = async (
   deviceMeta: TDeviceMeta,
 ) => {
 
-  console.log("payload_________",payload);
-
   const ticket = await googleClient.verifyIdToken({
     idToken: payload.idToken,
     audience: config.google.client_id,

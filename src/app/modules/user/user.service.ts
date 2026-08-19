@@ -265,7 +265,7 @@ const deactivateAccount = async (userId: string) => {
 const deleteAccount = async (userId: string, password: string) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
-  const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+  const passwordMatches = await bcrypt.compare(password, user.passwordHash as string);
   if (!passwordMatches) {
     throw new AppError(httpStatus.UNAUTHORIZED, "Password is incorrect");
   }

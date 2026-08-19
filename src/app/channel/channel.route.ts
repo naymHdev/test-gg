@@ -4,6 +4,9 @@ import { channelValidation } from "./channel.validation";
 import { Role } from "../../../generated/prisma/client";
 import auth from "../middleware/auth";
 import validateRequest from "../middleware/validateRequest";
+import { uploadFactory } from "../helpers/uploadFactory";
+import parseData from "../middleware/parseData";
+import { rateLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
@@ -106,6 +109,12 @@ router.get(
 router.post(
   "/:channelId/messages",
   auth(Role.User, Role.Moderator, Role.Admin, Role.Owner),
+  rateLimiter.sendMessage,
+  uploadFactory({ type: "mixed", maxFiles: 2 }).fields([
+    { name: "image", maxCount: 1 },
+    { name: "file", maxCount: 1 },
+  ]),
+  parseData(),
   validateRequest(channelValidation.sendChannelMessageValidation),
   channelController.sendMessage,
 );
