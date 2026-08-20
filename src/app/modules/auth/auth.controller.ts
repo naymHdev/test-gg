@@ -76,12 +76,16 @@ const refresh = catchAsync(async (req, res) => {
   }
   const deviceMeta = extractDeviceMeta(req);
   const result = await authService.refreshAccessToken(token, deviceMeta);
+  // console.log(result);
   setRefreshCookie(res, result.refreshToken);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Token refreshed",
-    data: { accessToken: result.accessToken },
+    data: {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    },
   });
 });
 
