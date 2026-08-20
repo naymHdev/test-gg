@@ -1,5 +1,5 @@
-import cors from "cors";
 import cookieParser from "cookie-parser";
+import cors from "cors";
 import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import helmet from "helmet";
@@ -21,53 +21,57 @@ app.use(
   }),
 );
 
-// app.use(
-//   cors({
-//     origin: true,
-//     credentials: true,
-//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-//   }),
-// );
-
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:3002",
-  "http://localhost:3003",
-
-  "https://finderq.gg",
-  "https://www.finderq.gg",
-
-  "https://api.finderq.gg",
-
-  "https://dashboard.finderq.gg",
-  "https://www.dashboard.finderq.gg",
-];
-
+// cors
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
+    origin: true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Cache-Control",
-      "Pragma",
-      "X-Requested-With",
-    ],
   }),
 );
+
+// const allowedOrigins = [
+//   "http://localhost:3000",
+//   "http://localhost:3001",
+//   "http://localhost:3002",
+//   "http://localhost:3003",
+
+//   "http://10.10.28.7:3000",
+//   "http://10.10.28.7:3001",
+
+//   "https://finderq.gg",
+//   "https://www.finderq.gg",
+
+//   "https://api.finderq.gg",
+
+//   "https://dashboard.finderq.gg",
+//   "https://www.dashboard.finderq.gg",
+// ];
+
+// app.use(
+//   cors({
+//     origin(origin, callback) {
+//       if (!origin) {
+//         return callback(null, true);
+//       }
+
+//       if (allowedOrigins.includes(origin)) {
+//         return callback(null, true);
+//       }
+
+//       return callback(new Error(`CORS blocked for origin: ${origin}`));
+//     },
+//     credentials: true,
+//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+//     allowedHeaders: [
+//       "Content-Type",
+//       "Authorization",
+//       "Cache-Control",
+//       "Pragma",
+//       "X-Requested-With",
+//     ],
+//   }),
+// );
 
 // Stripe needs the raw request body to verify the webhook signature, so this
 // must be registered before express.json() below.
